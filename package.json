@@ -1,0 +1,22 @@
+{
+  "name": "anklabo-bio",
+  "version": "1.0.0",
+  "description": "Personal aesthetic bio link website inspired by guns.lol & zyo.lol for AnkLaBo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "bio",
+    "guns.lol",
+    "zyo.lol",
+    "railway",
+    "aesthetic"
+  ],
+  "author": "anklabo29ms",
+  "license": "MIT"
+}
