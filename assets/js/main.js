@@ -1,10 +1,10 @@
 /**
  * Main Controller for AnkLaBo Bio
- * Điều khiển màn hình Click-to-enter, Typewriter, 3D Tilt, Particle Canvas & Custom Cursor
+ * Điều khiển Màn hình Enter, Badge Tooltip Bar, View Counter thật, Typewriter, Tilt & Effects
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Tải cấu hình từ LocalStorage nếu có
+    // 1. Tải cấu hình đã lưu nếu có
     const savedConfig = localStorage.getItem("anklabo_bio_custom_config");
     if (savedConfig) {
         try {
@@ -13,39 +13,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // 2. Khởi tạo các module
+    const effectsEngine = new window.EffectsEngine();
     const auth = new window.BioAuth(window.CONFIG);
     const musicPlayer = new window.MusicPlayer(window.CONFIG);
     
-    // Khởi tạo Discord Manager
+    // Discord Manager (Lanyard User ID sync)
     const discordManager = new window.DiscordManager(
         window.CONFIG,
         (profileUpdate) => handleDiscordProfileUpdate(profileUpdate),
         (presenceUpdate) => handleDiscordPresenceUpdate(presenceUpdate)
     );
 
-    // Khởi tạo Config Panel
-    const configPanel = new window.ConfigPanel(auth, discordManager, musicPlayer);
+    // Config Panel
+    const configPanel = new window.ConfigPanel(auth, discordManager, musicPlayer, effectsEngine);
 
-    // 3. Render giao diện Bio lần đầu
+    // 3. Render giao diện Bio
     renderBioProfile(window.CONFIG);
 
-    // 4. Màn hình chờ "Click to enter"
-    initEnterScreen(musicPlayer);
+    // 4. Kích hoạt hiệu ứng nền đã chọn
+    if (effectsEngine && window.CONFIG.theme && window.CONFIG.theme.backgroundMode) {
+        effectsEngine.setEffect(window.CONFIG.theme.backgroundMode);
+        effectsEngine.toggleScanlines(window.CONFIG.theme.scanlines !== false);
+    }
 
-    // 5. Hiệu ứng gõ chữ (Typewriter)
+    // 5. Màn hình chờ "Click to enter"
+    initEnterScreen(musicPlayer, effectsEngine);
+
+    // 6. Hiệu ứng gõ chữ (Typewriter)
     initTypewriter(window.CONFIG.profile.bioQuotes);
 
-    // 6. Hiệu ứng nghiêng 3D (Parallax Card Tilt)
+    // 7. Hiệu ứng nghiêng 3D (Parallax Card Tilt)
     initCardTilt();
 
-    // 7. Con trỏ chuột neon & Sparkle Trail
+    // 8. Con trỏ chuột neon & Sparkle Trail
     initCustomCursor();
 
-    // 8. Background Canvas (Hạt bụi ánh sáng vũ trụ)
-    initBackgroundCanvas();
+    // 9. Bộ đếm lượt xem THẬT (Real Server View Counter)
+    initRealViewCounter();
 
-    // 9. Bộ đếm lượt xem (View Counter)
-    initViewCounter();
+    // 10. Gán âm thanh click UI
+    initClickSounds(effectsEngine);
 });
 
 /**
@@ -54,10 +61,10 @@ document.addEventListener("DOMContentLoaded", () => {
 function renderBioProfile(config) {
     if (!config) return;
 
-    // CSS Variables màu chủ đạo
+    // Màu chủ đạo
     if (config.theme && config.theme.accentColor) {
         document.documentElement.style.setProperty("--accent", config.theme.accentColor);
-        document.documentElement.style.setProperty("--accent-glow", config.theme.glowColor || "rgba(139, 92, 246, 0.4)");
+        document.documentElement.style.setProperty("--accent-glow", config.theme.glowColor || "rgba(139, 92, 246, 0.45)");
     }
 
     // Banner & Avatar
@@ -76,9 +83,18 @@ function renderBioProfile(config) {
         avatarEl.src = config.profile.avatar;
     }
 
+    // Hiệu ứng viền Avatar
+    const avatarRing = document.getElementById("profile-avatar-ring");
+    if (avatarRing && config.theme) {
+        avatarRing.className = `avatar-ring ${config.theme.avatarEffect || "rainbow"}`;
+    }
+
     // Tên & Handle & UID
     const nameEl = document.getElementById("profile-name");
-    if (nameEl) nameEl.textContent = config.profile.username || "AnkLaBo";
+    if (nameEl) {
+        nameEl.textContent = config.profile.username || "AnkLaBo";
+        nameEl.className = `username ${config.theme.usernameEffect || "gradient"}`;
+    }
 
     const handleEl = document.getElementById("profile-handle");
     if (handleEl) handleEl.textContent = `@${config.profile.handle || "anklabo29ms"}`;
@@ -91,19 +107,8 @@ function renderBioProfile(config) {
         locationEl.textContent = config.profile.location || "Vietnam";
     }
 
-    // Badges
-    const badgesContainer = document.getElementById("profile-badges");
-    if (badgesContainer) {
-        badgesContainer.innerHTML = "";
-        const badges = config.badges || [];
-        badges.forEach(badge => {
-            const span = document.createElement("div");
-            span.className = "bio-badge";
-            span.setAttribute("data-tooltip", badge.tooltip || badge.name);
-            span.innerHTML = `<i class="${badge.icon}" style="color: ${badge.color}"></i>`;
-            badgesContainer.appendChild(span);
-        });
-    }
+    // Render Badges & Gắn tương tác thông minh cho Tooltip Bar
+    renderBadgesWithSmartTooltip(config.badges || []);
 
     // Social Links
     const socialsContainer = document.getElementById("profile-socials");
@@ -123,18 +128,82 @@ function renderBioProfile(config) {
         });
     }
 
-    // Background Image nếu không dùng video
+    // Background Image
     const bgImageEl = document.getElementById("bg-image-layer");
-    if (bgImageEl) {
-        if (config.theme.backgroundImageUrl) {
-            bgImageEl.style.backgroundImage = `url('${config.theme.backgroundImageUrl}')`;
-        }
+    if (bgImageEl && config.theme.backgroundImageUrl) {
+        bgImageEl.style.backgroundImage = `url('${config.theme.backgroundImageUrl}')`;
     }
 }
 window.renderBioProfile = renderBioProfile;
 
 /**
- * Xử lý cập nhật thông tin khi sync Discord
+ * Render Badges và xử lý thanh chú thích thông minh không bị che bởi Avatar
+ */
+function renderBadgesWithSmartTooltip(badges) {
+    const badgesContainer = document.getElementById("profile-badges");
+    const tooltipBar = document.getElementById("badge-tooltip-bar");
+    if (!badgesContainer || !tooltipBar) return;
+
+    badgesContainer.innerHTML = "";
+    const activeBadges = badges.filter(b => b.enabled !== false);
+
+    activeBadges.forEach((badge, index) => {
+        const badgeEl = document.createElement("div");
+        badgeEl.className = "bio-badge";
+        badgeEl.setAttribute("data-index", index);
+        badgeEl.innerHTML = `<i class="${badge.icon}" style="color: ${badge.color}"></i>`;
+
+        // Sự kiện chuột trên Desktop
+        badgeEl.addEventListener("mouseenter", () => showBadgeTooltip(badge, badgeEl));
+        badgeEl.addEventListener("mouseleave", () => hideBadgeTooltip());
+
+        // Sự kiện chạm trên Mobile
+        badgeEl.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showBadgeTooltip(badge, badgeEl);
+        });
+
+        badgesContainer.appendChild(badgeEl);
+    });
+
+    // Chạm ra ngoài thì ẩn tooltip
+    document.addEventListener("click", () => hideBadgeTooltip());
+}
+
+let tooltipTimeout = null;
+function showBadgeTooltip(badge, badgeEl) {
+    const tooltipBar = document.getElementById("badge-tooltip-bar");
+    if (!tooltipBar) return;
+
+    if (tooltipTimeout) clearTimeout(tooltipTimeout);
+
+    // Bỏ active cũ
+    document.querySelectorAll(".bio-badge").forEach(b => b.classList.remove("active-badge"));
+    badgeEl.classList.add("active-badge");
+
+    tooltipBar.innerHTML = `
+        <div class="tooltip-bar-content">
+            <span class="tooltip-icon"><i class="${badge.icon}" style="color: ${badge.color}"></i></span>
+            <span class="tooltip-title">${badge.name}</span>
+            <span class="tooltip-sep">•</span>
+            <span class="tooltip-desc">${badge.tooltip || badge.name}</span>
+        </div>
+    `;
+    tooltipBar.classList.add("visible");
+}
+
+function hideBadgeTooltip() {
+    const tooltipBar = document.getElementById("badge-tooltip-bar");
+    if (!tooltipBar) return;
+
+    tooltipTimeout = setTimeout(() => {
+        tooltipBar.classList.remove("visible");
+        document.querySelectorAll(".bio-badge").forEach(b => b.classList.remove("active-badge"));
+    }, 200);
+}
+
+/**
+ * Xử lý cập nhật Discord Profile
  */
 function handleDiscordProfileUpdate(profile) {
     if (!profile) return;
@@ -153,18 +222,14 @@ function handleDiscordProfileUpdate(profile) {
         const nameEl = document.getElementById("profile-name");
         if (nameEl) nameEl.textContent = profile.username;
     }
-    if (profile.accentColor) {
-        document.documentElement.style.setProperty("--accent", profile.accentColor);
-    }
 }
 
 /**
- * Xử lý trạng thái trực tiếp Discord (Lanyard Presence)
+ * Xử lý cập nhật Discord Presence (Spotify / Game)
  */
 function handleDiscordPresenceUpdate(presence) {
     if (!presence) return;
 
-    // Chấm trạng thái Avatar (online, idle, dnd, offline)
     const statusDot = document.getElementById("profile-status-dot");
     if (statusDot) {
         statusDot.className = `status-dot ${presence.status}`;
@@ -177,12 +242,10 @@ function handleDiscordPresenceUpdate(presence) {
         statusDot.setAttribute("data-tooltip", statusNames[presence.status] || presence.status);
     }
 
-    // Card hoạt động Discord (Spotify hoặc Game)
     const presenceBox = document.getElementById("discord-presence-box");
     if (!presenceBox) return;
 
     if (presence.spotify) {
-        // Đang nghe Spotify
         presenceBox.style.display = "flex";
         presenceBox.className = "discord-presence-box spotify-active";
         presenceBox.innerHTML = `
@@ -195,7 +258,6 @@ function handleDiscordPresenceUpdate(presence) {
             </div>
         `;
     } else if (presence.game) {
-        // Đang chơi game
         presenceBox.style.display = "flex";
         presenceBox.className = "discord-presence-box game-active";
         const iconUrl = presence.game.assets && presence.game.assets.large_image
@@ -214,7 +276,6 @@ function handleDiscordPresenceUpdate(presence) {
             </div>
         `;
     } else if (presence.customStatus && presence.customStatus.text) {
-        // Custom Status
         presenceBox.style.display = "flex";
         presenceBox.className = "discord-presence-box status-active";
         presenceBox.innerHTML = `
@@ -229,29 +290,23 @@ function handleDiscordPresenceUpdate(presence) {
 }
 
 /**
- * Khởi tạo màn hình Click to Enter
+ * Màn hình Click to Enter
  */
-function initEnterScreen(musicPlayer) {
+function initEnterScreen(musicPlayer, effectsEngine) {
     const enterScreen = document.getElementById("enter-screen");
     const profileCard = document.getElementById("profile-card");
     if (!enterScreen) return;
 
     const handleEnter = () => {
-        // Phát nhạc
+        if (effectsEngine) effectsEngine.playClick();
         if (musicPlayer && window.CONFIG.music.autoplayOnEnter) {
             musicPlayer.play();
         }
 
-        // Hiệu ứng chuyển cảnh
         enterScreen.classList.add("fade-out");
-        if (profileCard) {
-            profileCard.classList.add("card-appear");
-        }
+        if (profileCard) profileCard.classList.add("card-appear");
 
-        setTimeout(() => {
-            enterScreen.style.display = "none";
-        }, 800);
-
+        setTimeout(() => { enterScreen.style.display = "none"; }, 800);
         window.removeEventListener("click", handleEnter);
         window.removeEventListener("keydown", handleEnter);
     };
@@ -285,10 +340,10 @@ function initTypewriter(quotes) {
             charIndex++;
         }
 
-        let speed = isDeleting ? 40 : 80;
+        let speed = isDeleting ? 40 : 75;
 
         if (!isDeleting && charIndex === currentQuote.length) {
-            speed = 2000; // Dừng lại đọc
+            speed = 2200;
             isDeleting = true;
         } else if (isDeleting && charIndex === 0) {
             isDeleting = false;
@@ -303,42 +358,32 @@ function initTypewriter(quotes) {
 }
 
 /**
- * Hiệu ứng nghiêng 3D (Parallax Card Tilt)
+ * Hiệu ứng nghiêng 3D Parallax
  */
 function initCardTilt() {
     const card = document.getElementById("profile-card");
     if (!card || window.innerWidth < 768) return;
 
     let bounds;
-    function updateBounds() {
-        bounds = card.getBoundingClientRect();
-    }
+    function updateBounds() { bounds = card.getBoundingClientRect(); }
     updateBounds();
     window.addEventListener("resize", updateBounds);
 
     document.addEventListener("mousemove", (e) => {
         if (!bounds) return;
-        const mouseX = e.clientX;
-        const mouseY = e.clientY;
-
-        const leftX = mouseX - bounds.x;
-        const topY = mouseY - bounds.y;
+        const leftX = e.clientX - bounds.x;
+        const topY = e.clientY - bounds.y;
 
         const center = {
             x: leftX - bounds.width / 2,
             y: topY - bounds.height / 2
         };
 
-        const distance = Math.sqrt(center.x ** 2 + center.y ** 2);
-
-        // Góc xoay tối đa 8 độ
         const maxAngle = 8;
         const rotateX = (-center.y / (bounds.height / 2)) * maxAngle;
         const rotateY = (center.x / (bounds.width / 2)) * maxAngle;
 
         card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.01, 1.01, 1.01)`;
-
-        // Specular glare reflection
         card.style.setProperty("--glare-x", `${(leftX / bounds.width) * 100}%`);
         card.style.setProperty("--glare-y", `${(topY / bounds.height) * 100}%`);
     });
@@ -349,7 +394,7 @@ function initCardTilt() {
 }
 
 /**
- * Con trỏ chuột neon & Sparkle Trail
+ * Con trỏ chuột neon & Sparkles
  */
 function initCustomCursor() {
     const cursor = document.getElementById("custom-cursor");
@@ -364,7 +409,7 @@ function initCustomCursor() {
         mouseY = e.clientY;
         cursor.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0)`;
 
-        if (window.CONFIG.theme && window.CONFIG.theme.sparkleTrail && Math.random() > 0.6) {
+        if (window.CONFIG.theme && window.CONFIG.theme.sparkleTrail && Math.random() > 0.65) {
             createSparkle(mouseX, mouseY);
         }
     });
@@ -377,12 +422,9 @@ function initCustomCursor() {
     }
     renderFollower();
 
-    // Hiệu ứng khi bấm chuột
     document.addEventListener("mousedown", () => {
         follower.classList.add("active");
-        for (let i = 0; i < 5; i++) {
-            createSparkle(mouseX, mouseY);
-        }
+        for (let i = 0; i < 4; i++) createSparkle(mouseX, mouseY);
     });
     document.addEventListener("mouseup", () => follower.classList.remove("active"));
 }
@@ -394,91 +436,54 @@ function createSparkle(x, y) {
     sparkle.style.top = `${y}px`;
 
     const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 30 + 10;
-    const destX = Math.cos(angle) * speed;
-    const destY = Math.sin(angle) * speed;
-
-    sparkle.style.setProperty("--dest-x", `${destX}px`);
-    sparkle.style.setProperty("--dest-y", `${destY}px`);
+    const speed = Math.random() * 25 + 10;
+    sparkle.style.setProperty("--dest-x", `${Math.cos(angle) * speed}px`);
+    sparkle.style.setProperty("--dest-y", `${Math.sin(angle) * speed}px`);
 
     document.body.appendChild(sparkle);
     setTimeout(() => sparkle.remove(), 600);
 }
 
 /**
- * Hiệu ứng Canvas Hạt sao vũ trụ
+ * Bộ đếm VIEW THẬT (Real Server View Counter)
  */
-function initBackgroundCanvas() {
-    const canvas = document.getElementById("bg-canvas");
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    let width, height;
-    let particles = [];
-
-    function resize() {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
-    }
-    resize();
-    window.addEventListener("resize", resize);
-
-    const particleCount = Math.min(80, Math.floor((window.innerWidth * window.innerHeight) / 12000));
-    for (let i = 0; i < particleCount; i++) {
-        particles.push({
-            x: Math.random() * width,
-            y: Math.random() * height,
-            radius: Math.random() * 1.5 + 0.5,
-            vx: (Math.random() - 0.5) * 0.4,
-            vy: (Math.random() - 0.5) * 0.4,
-            alpha: Math.random() * 0.6 + 0.2
-        });
-    }
-
-    function animate() {
-        ctx.clearRect(0, 0, width, height);
-
-        const accentColor = (window.CONFIG.theme && window.CONFIG.theme.accentColor) || "#8b5cf6";
-
-        particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-
-            if (p.x < 0) p.x = width;
-            if (p.x > width) p.x = 0;
-            if (p.y < 0) p.y = height;
-            if (p.y > height) p.y = 0;
-
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(180, 160, 255, ${p.alpha})`;
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = accentColor;
-            ctx.fill();
-        });
-
-        requestAnimationFrame(animate);
-    }
-    animate();
-}
-
-/**
- * Bộ đếm lượt xem (View Counter)
- */
-function initViewCounter() {
+async function initRealViewCounter() {
     const viewEl = document.getElementById("profile-views");
     if (!viewEl) return;
 
+    try {
+        // Gửi POST request tới API của server Railway để tăng view và lấy kết quả
+        const res = await fetch("/api/views", { method: "POST" });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data.views === "number") {
+                viewEl.textContent = data.views.toLocaleString();
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn("Không kết nối được server view, dùng fallback:", e);
+    }
+
+    // Fallback nếu chạy ở môi trường không có server
     let views = parseInt(localStorage.getItem("anklabo_bio_views") || (window.CONFIG.profile.viewsInitial || 1337));
     views += 1;
     localStorage.setItem("anklabo_bio_views", views.toString());
-
     viewEl.textContent = views.toLocaleString();
 }
 
 /**
- * Toast thông báo nhỏ góc màn hình
+ * Gán âm thanh click UI vào các nút
  */
+function initClickSounds(effectsEngine) {
+    if (!effectsEngine) return;
+    document.addEventListener("click", (e) => {
+        if (e.target.closest("button") || e.target.closest(".social-btn") || e.target.closest(".bio-badge")) {
+            effectsEngine.playClick();
+        }
+    });
+}
+
 function showBioToast(msg) {
     let toast = document.getElementById("bio-toast");
     if (!toast) {
@@ -488,8 +493,6 @@ function showBioToast(msg) {
     }
     toast.textContent = msg;
     toast.className = "show";
-    setTimeout(() => {
-        toast.className = "";
-    }, 3200);
+    setTimeout(() => { toast.className = ""; }, 3200);
 }
 window.showBioToast = showBioToast;
