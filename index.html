@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AnkLaBo - Personal Bio</title>
+    
+    <!-- Open Graph & Meta Tags -->
+    <meta name="description" content="Personal aesthetic bio link website for AnkLaBo. Inspired by guns.lol & zyo.lol.">
+    <meta property="og:title" content="AnkLaBo - Personal Bio">
+    <meta property="og:description" content="Personal aesthetic bio link website for AnkLaBo.">
+    <meta property="og:image" content="https://avatars.githubusercontent.com/u/102527670?v=4">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#8b5cf6">
+    <link rel="icon" type="image/x-icon" href="https://avatars.githubusercontent.com/u/102527670?v=4">
+
+    <!-- Google Fonts & Font Awesome 6 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/player.css">
+    <link rel="stylesheet" href="assets/css/config-panel.css">
+</head>
+<body>
+
+    <!-- Ambient Background Layers -->
+    <div id="bg-layer-container">
+        <div id="bg-image-layer"></div>
+        <canvas id="bg-canvas"></canvas>
+        <div class="ambient-glow glow-1"></div>
+        <div class="ambient-glow glow-2"></div>
+    </div>
+
+    <!-- Gatekeeper / Click to enter screen -->
+    <div id="enter-screen">
+        <div class="enter-content">
+            <div class="enter-brand">ANKLABO</div>
+            <div class="enter-prompt">[ click anywhere to enter ]</div>
+        </div>
+    </div>
+
+    <!-- Main Bio Card Container -->
+    <div class="main-wrapper">
+        <div id="profile-card">
+            <!-- Banner -->
+            <div id="profile-banner" class="card-banner"></div>
+
+            <!-- Secret Config Gear Button -->
+            <button id="open-config-btn" title="Cài đặt Bio (Yêu cầu mật khẩu)">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+
+            <!-- Card Body -->
+            <div class="card-body">
+                <!-- Avatar & Live Status -->
+                <div class="avatar-container">
+                    <div class="avatar-ring"></div>
+                    <img id="profile-avatar-img" src="https://avatars.githubusercontent.com/u/102527670?v=4" alt="Avatar" class="avatar-img">
+                    <div id="profile-status-dot" class="status-dot offline" data-tooltip="Ngoại tuyến"></div>
+                </div>
+
+                <!-- User Info -->
+                <div class="user-identity">
+                    <div class="name-badges-row">
+                        <h1 id="profile-name" class="username">AnkLaBo</h1>
+                        <div id="profile-badges" class="badges-container"></div>
+                    </div>
+                    <div class="user-meta-row">
+                        <span id="profile-handle">@anklabo29ms</span>
+                        <span id="profile-uid" class="meta-pill">UID: 1</span>
+                        <span id="profile-location" class="meta-pill"><i class="fa-solid fa-location-dot"></i> Vietnam</span>
+                    </div>
+                </div>
+
+                <!-- Typewriter Bio -->
+                <div class="typewriter-container">
+                    <span id="typewriter-text"></span><span class="typewriter-cursor"></span>
+                </div>
+
+                <!-- Live Discord Presence Box (Spotify / Game) -->
+                <div id="discord-presence-box" class="discord-presence-box"></div>
+
+                <!-- Social Links -->
+                <div id="profile-socials" class="socials-container"></div>
+
+                <!-- Music Player Widget -->
+                <div class="music-player-widget">
+                    <!-- Frequency Visualizer Canvas -->
+                    <div class="visualizer-wrapper">
+                        <canvas id="audio-visualizer" width="450" height="36"></canvas>
+                    </div>
+
+                    <!-- Track Details & Play Button -->
+                    <div class="player-info-row">
+                        <div class="player-cover">
+                            <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=400&auto=format&fit=crop" alt="Album Cover">
+                        </div>
+                        <div class="player-text-details">
+                            <div class="player-title">Cyber Aesthetic Lo-Fi</div>
+                            <div class="player-artist">Synthwave Beats</div>
+                        </div>
+                        <div class="player-main-ctrls">
+                            <button id="play-pause-btn" class="player-btn play-btn" title="Play/Pause">
+                                <i class="fa-solid fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div id="player-progress" class="player-progress-bar">
+                        <div id="player-progress-fill" class="player-progress-fill"></div>
+                    </div>
+
+                    <!-- Bottom Controls: Time & Volume -->
+                    <div class="player-bottom-row">
+                        <div class="player-times">
+                            <span id="player-current-time">00:00</span> / <span id="player-duration">00:00</span>
+                        </div>
+                        <div class="player-volume-control">
+                            <button id="player-mute" title="Mute/Unmute"><i class="fa-solid fa-volume-high"></i></button>
+                            <input type="range" id="player-volume" min="0" max="100" value="50" class="player-volume-slider" title="Âm lượng">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Footer (Views & Domain) -->
+                <div class="card-footer">
+                    <div class="footer-views">
+                        <i class="fa-solid fa-eye"></i> <span id="profile-views">1,337</span> views
+                    </div>
+                    <div>anklabo.bio</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="audio-source" preload="metadata" crossorigin="anonymous"></audio>
+
+    <!-- Custom Cursor -->
+    <div id="custom-cursor"></div>
+    <div id="cursor-follower"></div>
+
+    <!-- ====================================================================
+         PASSWORD PROMPT MODAL
+         ==================================================================== -->
+    <div id="password-modal" class="glass-modal-overlay">
+        <div class="glass-modal-card">
+            <button id="password-close-btn" class="modal-close-icon"><i class="fa-solid fa-xmark"></i></button>
+            <div class="pwd-lock-icon"><i class="fa-solid fa-shield-halved"></i></div>
+            <h2 class="modal-title">Xác thực Quản trị</h2>
+            <p class="modal-desc">Vui lòng nhập mật khẩu Master để truy cập bảng cấu hình Bio của bạn.</p>
+            <div class="pwd-input-wrapper">
+                <input type="password" id="password-input" class="pwd-input" placeholder="Nhập mật khẩu..." autocomplete="off">
+                <div id="password-error-msg" class="pwd-error"></div>
+            </div>
+            <button id="password-submit-btn" class="btn-primary">Mở khóa <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         LIVE CONFIG DASHBOARD MODAL
+         ==================================================================== -->
+    <div id="config-modal" class="glass-modal-overlay">
+        <div class="config-modal-card">
+            <div class="config-header">
+                <h3><i class="fa-solid fa-sliders"></i> Cài đặt Bio Cá nhân</h3>
+                <button id="config-close-btn" class="modal-close-icon"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="config-tabs-nav">
+                <button class="config-tab-btn active" data-tab="profile"><i class="fa-solid fa-user"></i> Hồ sơ</button>
+                <button class="config-tab-btn" data-tab="discord"><i class="fa-brands fa-discord"></i> Discord Sync</button>
+                <button class="config-tab-btn" data-tab="socials"><i class="fa-solid fa-link"></i> Mạng xã hội</button>
+                <button class="config-tab-btn" data-tab="music"><i class="fa-solid fa-music"></i> Nhạc nền</button>
+                <button class="config-tab-btn" data-tab="theme"><i class="fa-solid fa-palette"></i> Giao diện</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="config-body">
+                <!-- TAB 1: PROFILE -->
+                <div id="tab-profile" class="config-tab-pane active">
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Tên hiển thị (Username)</label>
+                        <input type="text" id="cfg-username" class="cfg-input" placeholder="AnkLaBo">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Handle (@)</label>
+                        <input type="text" id="cfg-handle" class="cfg-input" placeholder="anklabo29ms">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">UID / Số thứ tự</label>
+                        <input type="text" id="cfg-uid" class="cfg-input" placeholder="1">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Vị trí (Location)</label>
+                        <input type="text" id="cfg-location" class="cfg-input" placeholder="Vietnam 🇻🇳">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Avatar URL</label>
+                        <input type="text" id="cfg-avatar" class="cfg-input" placeholder="https://...">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Banner URL (Ảnh bìa)</label>
+                        <input type="text" id="cfg-banner" class="cfg-input" placeholder="https://...">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Các câu gõ chữ Typewriter (Mỗi câu 1 dòng)</label>
+                        <textarea id="cfg-quotes" class="cfg-textarea" rows="4" placeholder="Nhập các câu giới thiệu..."></textarea>
+                    </div>
+                </div>
+
+                <!-- TAB 2: DISCORD SYNC -->
+                <div id="tab-discord" class="config-tab-pane">
+                    <div class="discord-sync-hero">
+                        <p>Tự động lấy Avatar, Banner, Tên hiển thị và Trạng thái trực tiếp từ Discord giống như guns.lol & zyo.lol.</p>
+                        <button type="button" id="cfg-discord-oauth-btn" class="discord-btn-oauth">
+                            <i class="fa-brands fa-discord"></i> Đăng nhập qua Discord (OAuth2)
+                        </button>
+                    </div>
+
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Discord User ID (Đồng bộ nhanh tức thì)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="cfg-discord-user-id" class="cfg-input" placeholder="VD: 102527670">
+                            <button type="button" id="cfg-discord-sync-btn" class="btn-accent" style="white-space: nowrap;">
+                                <i class="fa-brands fa-discord"></i> Đồng bộ ngay
+                            </button>
+                        </div>
+                        <div class="cfg-hint">Lấy Discord ID bằng cách click chuột phải vào tên bạn trên Discord -> Copy User ID.</div>
+                    </div>
+
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Discord Client ID (Tùy chọn, dùng cho nút Login OAuth2 ở trên)</label>
+                        <input type="text" id="cfg-discord-client-id" class="cfg-input" placeholder="Nhập Discord App Client ID nếu có">
+                    </div>
+
+                    <label class="cfg-checkbox-row">
+                        <input type="checkbox" id="cfg-discord-auto-sync" checked>
+                        <span>Tự động cập nhật Avatar & Banner từ Discord khi tải trang</span>
+                    </label>
+
+                    <label class="cfg-checkbox-row">
+                        <input type="checkbox" id="cfg-discord-show-presence" checked>
+                        <span>Hiển thị thông tin bài hát Spotify / Game đang chơi (Lanyard)</span>
+                    </label>
+                </div>
+
+                <!-- TAB 3: SOCIALS -->
+                <div id="tab-socials" class="config-tab-pane">
+                    <div class="cfg-label" style="margin-bottom: 12px;">Danh sách liên kết mạng xã hội</div>
+                    <div id="cfg-social-list"></div>
+                </div>
+
+                <!-- TAB 4: MUSIC -->
+                <div id="tab-music" class="config-tab-pane">
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Tên bài hát</label>
+                        <input type="text" id="cfg-music-title" class="cfg-input" placeholder="Tên bài hát">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Tên nghệ sĩ</label>
+                        <input type="text" id="cfg-music-artist" class="cfg-input" placeholder="Tên nghệ sĩ">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Ảnh bìa bài hát (Cover URL)</label>
+                        <input type="text" id="cfg-music-cover" class="cfg-input" placeholder="https://...">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Đường dẫn file nhạc (.mp3 URL)</label>
+                        <input type="text" id="cfg-music-src" class="cfg-input" placeholder="https://.../music.mp3">
+                    </div>
+                </div>
+
+                <!-- TAB 5: THEME -->
+                <div id="tab-theme" class="config-tab-pane">
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Màu sắc chủ đạo (Accent Color)</label>
+                        <input type="color" id="cfg-theme-accent" style="width: 100%; height: 42px; background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; cursor: pointer;">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Chế độ nền (Background Mode)</label>
+                        <select id="cfg-theme-bg-mode" class="cfg-input">
+                            <option value="particles">Hạt sao vũ trụ (Particles Canvas)</option>
+                            <option value="image">Hình nền tĩnh (Image)</option>
+                            <option value="video">Video Loop (MP4)</option>
+                        </select>
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Link ảnh nền (Background Image URL)</label>
+                        <input type="text" id="cfg-theme-bg-img" class="cfg-input" placeholder="https://...">
+                    </div>
+                    <div class="cfg-form-group">
+                        <label class="cfg-label">Link video nền (Background Video URL .mp4)</label>
+                        <input type="text" id="cfg-theme-bg-vid" class="cfg-input" placeholder="https://.../bg.mp4">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="config-footer">
+                <div class="config-footer-left">
+                    <button type="button" id="config-reset-btn" class="btn-secondary" title="Đặt lại về mặc định ban đầu">
+                        <i class="fa-solid fa-rotate-left"></i> Đặt lại
+                    </button>
+                </div>
+                <div class="config-footer-right">
+                    <button type="button" id="config-export-btn" class="btn-secondary">
+                        <i class="fa-solid fa-download"></i> Tải config.js
+                    </button>
+                    <button type="button" id="config-save-local-btn" class="btn-accent">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu & Áp dụng
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/discord.js"></script>
+    <script src="assets/js/player.js"></script>
+    <script src="assets/js/config-panel.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>
