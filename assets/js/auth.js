@@ -1,14 +1,16 @@
 /**
  * Auth & Crypto Module for AnkLaBo Bio
- * Bảo mật tuyệt đối: Sử dụng Web Crypto API (SHA-256 + Salt)
- * Mật khẩu gốc không bao giờ được lưu dưới dạng plain text.
+ * Bảo mật tuyệt đối:
+ * - Sử dụng Web Crypto API (SHA-256 + Salt)
+ * - Mật khẩu gốc không bao giờ được lưu dưới dạng plain text
+ * - Cơ chế In-Memory: F5 hoặc tải lại trang web là lập tức reset quyền quản trị
  */
 
 class BioAuth {
     constructor(config) {
         this.config = (config && config.auth) ? config.auth : {};
+        // Tuyệt đối không lưu vào sessionStorage/localStorage để đảm bảo F5 là reset
         this.isAuthenticated = false;
-        this.checkSession();
     }
 
     /**
@@ -32,19 +34,9 @@ class BioAuth {
         
         const valid = (computedHash === this.config.passwordHash);
         if (valid) {
-            this.isAuthenticated = true;
-            sessionStorage.setItem("anklabo_auth_session", "true");
+            this.isAuthenticated = true; // Chỉ lưu trong RAM phiên hiện tại
         }
         return valid;
-    }
-
-    /**
-     * Kiểm tra phiên đăng nhập hiện tại trong tab
-     */
-    checkSession() {
-        if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("anklabo_auth_session") === "true") {
-            this.isAuthenticated = true;
-        }
     }
 
     /**
@@ -52,9 +44,6 @@ class BioAuth {
      */
     logout() {
         this.isAuthenticated = false;
-        if (typeof sessionStorage !== "undefined") {
-            sessionStorage.removeItem("anklabo_auth_session");
-        }
     }
 
     /**
