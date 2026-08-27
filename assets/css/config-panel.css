@@ -1,0 +1,448 @@
+/* ==========================================================================
+   AnkLaBo Bio - Password Modal & Live Config Panel Styles
+   ========================================================================== */
+
+/* ==========================================================================
+   PASSWORD PROMPT MODAL
+   ========================================================================== */
+.glass-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    padding: 16px;
+}
+
+.glass-modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.glass-modal-card {
+    background: rgba(18, 18, 23, 0.88);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px var(--accent-glow);
+    position: relative;
+    transform: scale(0.92);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-modal-overlay.active .glass-modal-card {
+    transform: scale(1);
+}
+
+.modal-close-icon {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.modal-close-icon:hover {
+    color: #fff;
+}
+
+.pwd-lock-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin: 0 auto 16px;
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+}
+
+.modal-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.pwd-input-wrapper {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.pwd-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s ease;
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+.pwd-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.pwd-error {
+    color: #ef4444;
+    font-size: 0.78rem;
+    margin-top: 6px;
+    min-height: 18px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.pwd-error.visible {
+    opacity: 1;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px var(--accent-glow);
+    margin-top: 6px;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--accent-glow);
+}
+
+/* Shake Animation khi sai mật khẩu */
+@keyframes shakeAnimation {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-8px); }
+    40%, 80% { transform: translateX(8px); }
+}
+
+.glass-modal-card.shake {
+    animation: shakeAnimation 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ==========================================================================
+   LIVE CONFIG DASHBOARD MODAL
+   ========================================================================== */
+.config-modal-card {
+    background: rgba(18, 18, 23, 0.95);
+    backdrop-filter: blur(35px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 22px;
+    width: 100%;
+    max-width: 680px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 40px var(--accent-glow);
+    position: relative;
+    overflow: hidden;
+    transform: scale(0.94);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-modal-overlay.active .config-modal-card {
+    transform: scale(1);
+}
+
+.config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.config-header h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.config-header h3 i {
+    color: var(--accent);
+}
+
+/* Config Tabs */
+.config-tabs-nav {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.25);
+    overflow-x: auto;
+}
+
+.config-tab-btn {
+    padding: 12px 18px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.config-tab-btn:hover {
+    color: #fff;
+}
+
+.config-tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+/* Config Body / Content */
+.config-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.config-tab-pane {
+    display: none;
+}
+
+.config-tab-pane.active {
+    display: block;
+    animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form Styles */
+.cfg-form-group {
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.cfg-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #d4d4d8;
+    margin-bottom: 6px;
+}
+
+.cfg-input, .cfg-textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cfg-input:focus, .cfg-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.cfg-textarea {
+    resize: vertical;
+    min-height: 70px;
+    font-family: inherit;
+}
+
+.cfg-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Checkbox toggle */
+.cfg-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.cfg-checkbox-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+}
+
+/* Discord Special Sync Box */
+.discord-sync-hero {
+    background: rgba(88, 101, 242, 0.12);
+    border: 1px solid rgba(88, 101, 242, 0.35);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.discord-sync-hero p {
+    font-size: 0.84rem;
+    color: #e4e4e7;
+    margin-bottom: 14px;
+}
+
+.discord-btn-oauth {
+    background: #5865F2;
+    border: none;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.discord-btn-oauth:hover {
+    background: #4752C4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(88, 101, 242, 0.4);
+}
+
+/* Social items editor list */
+.cfg-social-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.cfg-social-row .social-name { flex: 1.2; }
+.cfg-social-row .social-icon { flex: 1.5; }
+.cfg-social-row .social-url { flex: 2.5; }
+
+.cfg-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.84rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.cfg-btn.danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cfg-btn.danger:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+/* Footer Action Buttons */
+.config-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.25);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.config-footer-left {
+    display: flex;
+    gap: 8px;
+}
+
+.config-footer-right {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e4e4e7;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+.btn-accent {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #fff;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px var(--accent-glow);
+    transition: all 0.2s ease;
+}
+
+.btn-accent:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
