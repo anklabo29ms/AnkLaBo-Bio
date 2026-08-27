@@ -1,8 +1,6 @@
 # ⚡ AnkLaBo-Bio - Aesthetic Bio Link
 
-> Trang web Bio cá nhân mang phong cách **guns.lol** và **zyo.lol**, được thiết kế độc quyền dành riêng cho **AnkLaBo**.
-
-🌐 **Xem trực tiếp tại:** [https://anklabo29ms.github.io/AnkLaBo-Bio/](https://anklabo29ms.github.io/AnkLaBo-Bio/)
+> Trang web Bio cá nhân mang phong cách **guns.lol** và **zyo.lol**, được thiết kế độc quyền dành riêng cho **AnkLaBo**, tối ưu hóa toàn diện để chạy trên **Railway** và **GitHub Pages**.
 
 ---
 
@@ -23,16 +21,23 @@
 
 ---
 
-## 🚀 Hướng dẫn kích hoạt GitHub Pages
+## 🚂 Hướng dẫn Deploy lên Railway (Tối ưu 100%)
 
-Trang web đã được cấu hình sẵn GitHub Actions tự động deploy. Để web chạy online ngay:
+Dự án đã được cấu hình sẵn các file tối ưu riêng cho Railway (`server.js`, `package.json`, `railway.json`, `Procfile`, `Dockerfile`):
+- **Tự động nhận diện Port**: Lắng nghe theo `process.env.PORT` và bind host `0.0.0.0`.
+- **Healthcheck Endpoint**: Sẵn sàng tại `/health` giúp Railway tự kiểm tra trạng thái và auto-heal.
+- **Hỗ trợ HTTP Range Requests**: Tua nhạc MP3 và video MP4 mượt mà không bị giật lag.
+- **Siêu nhẹ**: Thuần Node.js native, không tốn thời gian tải packages, tiêu thụ RAM cực thấp (< 20MB).
 
-1. Truy cập vào mục Cài đặt GitHub Pages của repo:
-   👉 **[https://github.com/anklabo29ms/AnkLaBo-Bio/settings/pages](https://github.com/anklabo29ms/AnkLaBo-Bio/settings/pages)**
-2. Tại mục **Build and deployment** -> **Source**:
-   - Chọn **GitHub Actions** (hoặc chọn **Deploy from a branch** -> Nhánh `main` -> Thư mục `/(root)` -> Bấm **Save**).
-3. Đợi khoảng 1 - 2 phút, trang web của bạn sẽ chính thức online tại địa chỉ:
-   🔗 **`https://anklabo29ms.github.io/AnkLaBo-Bio/`**
+### Các bước triển khai lên Railway:
+1. Đăng nhập vào [Railway Dashboard](https://railway.com/).
+2. Nhấn nút **New Project** -> Chọn **Deploy from GitHub repo**.
+3. Chọn repository **`anklabo29ms/AnkLaBo-Bio`**.
+4. Railway sẽ tự động nhận diện và build triển khai trong khoảng 20 - 30 giây!
+5. **Tạo Domain công khai**:
+   - Nhấp vào service vừa tạo -> Chọn tab **Settings**.
+   - Cuộn xuống phần **Networking** -> Nhấn **Generate Domain** (bạn sẽ nhận được domain dạng `xxx.up.railway.app`).
+   - Hoặc bạn có thể nhấn **Custom Domain** để gắn tên miền riêng của bạn vào.
 
 ---
 
