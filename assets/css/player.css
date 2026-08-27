@@ -1,22 +1,22 @@
 /* ==========================================================================
-   AnkLaBo Bio - Music Player & Visualizer Styles
+   AnkLaBo Bio - Music Player & Visualizer Styles (Playlist & Multi-platform)
    ========================================================================== */
 
 .music-player-widget {
     background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(15px);
+    backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    padding: 14px;
+    border-radius: 18px;
+    padding: 14px 16px;
     margin-top: 18px;
     position: relative;
     overflow: hidden;
 }
 
-/* Visualizer Canvas in background of player */
+/* Visualizer Canvas */
 .visualizer-wrapper {
     width: 100%;
-    height: 36px;
+    height: 38px;
     margin-bottom: 8px;
     display: flex;
     align-items: flex-end;
@@ -51,12 +51,12 @@
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
     transition: transform 0.3s ease;
 }
 
 .player-cover img.spinning {
-    animation: spinRecord 8s linear infinite;
+    animation: spinRecord 7s linear infinite;
 }
 
 @keyframes spinRecord {
@@ -70,6 +70,12 @@
     text-align: left;
 }
 
+.player-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .player-title {
     font-size: 0.92rem;
     font-weight: 700;
@@ -79,45 +85,67 @@
     text-overflow: ellipsis;
 }
 
+.player-track-counter {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--accent);
+    background: rgba(139, 92, 246, 0.15);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+}
+
 .player-artist {
     font-size: 0.78rem;
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-top: 2px;
 }
 
+/* Main Controls Row (Prev, Play, Next) */
 .player-main-ctrls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .player-btn {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
-    width: 38px;
-    height: 38px;
+    color: #e4e4e7;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    font-size: 0.82rem;
     transition: all 0.2s ease;
 }
 
 .player-btn:hover {
-    background: var(--accent);
-    border-color: var(--accent);
-    box-shadow: 0 0 15px var(--accent-glow);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
     transform: scale(1.08);
 }
 
 .player-btn.play-btn {
     background: var(--accent);
     border-color: var(--accent);
-    box-shadow: 0 0 12px var(--accent-glow);
+    color: #fff;
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+    box-shadow: 0 0 14px var(--accent-glow);
+}
+
+.player-btn.play-btn:hover {
+    background: var(--accent-hover);
+    box-shadow: 0 0 20px var(--accent-glow);
+    transform: scale(1.1);
 }
 
 /* Seek Bar */
