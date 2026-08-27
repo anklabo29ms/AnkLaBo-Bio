@@ -1,13 +1,18 @@
 /**
- * Live Config Panel & Password Modal Controller for AnkLaBo Bio
- * Cho phép chỉnh sửa cấu hình trực tiếp với mật khẩu bảo vệ tuyệt đối
+ * Live Config Panel Controller for AnkLaBo Bio
+ * Hỗ trợ:
+ * 1. Mật khẩu in-memory (F5 tự động reset yêu cầu nhập lại)
+ * 2. Fetch nhạc tự động qua link YouTube / MP3
+ * 3. Tùy biến sâu Profile (Avatar effects, Username effects, Background modes, CRT scanlines)
+ * 4. Quản lý bật/tắt toàn bộ Huy hiệu Discord
  */
 
 class ConfigPanel {
-    constructor(auth, discordManager, musicPlayer) {
+    constructor(auth, discordManager, musicPlayer, effectsEngine) {
         this.auth = auth;
         this.discordManager = discordManager;
         this.musicPlayer = musicPlayer;
+        this.effectsEngine = effectsEngine;
 
         this.currentConfig = JSON.parse(JSON.stringify(window.CONFIG));
         this.loadLocalConfig();
@@ -17,7 +22,6 @@ class ConfigPanel {
     }
 
     initDOMElements() {
-        // Nút mở config
         this.configBtn = document.getElementById("open-config-btn");
 
         // Modal mật khẩu
@@ -38,9 +42,12 @@ class ConfigPanel {
         this.tabBtns = document.querySelectorAll(".config-tab-btn");
         this.tabPanes = document.querySelectorAll(".config-tab-pane");
 
-        // Discord actions trong config
+        // Discord actions
         this.discordSyncBtn = document.getElementById("cfg-discord-sync-btn");
-        this.discordOAuthBtn = document.getElementById("cfg-discord-oauth-btn");
+
+        // YouTube / Music Fetch
+        this.musicUrlInput = document.getElementById("cfg-music-url-input");
+        this.musicFetchBtn = document.getElementById("cfg-music-fetch-btn");
     }
 
     bindEvents() {
@@ -48,7 +55,6 @@ class ConfigPanel {
             this.configBtn.addEventListener("click", () => this.handleOpenConfig());
         }
 
-        // Xử lý xác thực mật khẩu
         if (this.pwdSubmit) {
             this.pwdSubmit.addEventListener("click", () => this.handlePasswordSubmit());
         }
@@ -61,12 +67,10 @@ class ConfigPanel {
             this.pwdClose.addEventListener("click", () => this.closePasswordModal());
         }
 
-        // Đóng modal config
         if (this.cfgClose) {
             this.cfgClose.addEventListener("click", () => this.closeConfigModal());
         }
 
-        // Chuyển tab trong bảng config
         this.tabBtns.forEach(btn => {
             btn.addEventListener("click", () => {
                 const targetTab = btn.getAttribute("data-tab");
@@ -74,18 +78,16 @@ class ConfigPanel {
             });
         });
 
-        // Nút Discord Sync
+        // Discord Sync
         if (this.discordSyncBtn) {
             this.discordSyncBtn.addEventListener("click", () => this.handleDiscordManualSync());
         }
-        if (this.discordOAuthBtn) {
-            this.discordOAuthBtn.addEventListener("click", () => {
-                const clientId = document.getElementById("cfg-discord-client-id").value.trim();
-                this.discordManager.loginWithDiscord(clientId);
-            });
+
+        // Fetch link nhạc YouTube / MP3
+        if (this.musicFetchBtn && this.musicUrlInput) {
+            this.musicFetchBtn.addEventListener("click", () => this.handleFetchMusicUrl());
         }
 
-        // Nút lưu & xuất file
         if (this.saveLocalBtn) {
             this.saveLocalBtn.addEventListener("click", () => this.saveToLocalStorage());
         }
@@ -96,7 +98,6 @@ class ConfigPanel {
             this.resetBtn.addEventListener("click", () => this.resetConfig());
         }
 
-        // Live update khi người dùng gõ
         this.bindLiveFormInputs();
     }
 
@@ -107,13 +108,12 @@ class ConfigPanel {
                 const parsed = JSON.parse(saved);
                 this.currentConfig = Object.assign({}, this.currentConfig, parsed);
                 window.CONFIG = this.currentConfig;
-            } catch (e) {
-                console.error("Lỗi khi load custom config:", e);
-            }
+            } catch (e) {}
         }
     }
 
     handleOpenConfig() {
+        if (this.effectsEngine) this.effectsEngine.playClick();
         if (this.auth.isAuthenticated) {
             this.openConfigModal();
         } else {
@@ -144,7 +144,7 @@ class ConfigPanel {
             this.closePasswordModal();
             this.openConfigModal();
             if (typeof window.showBioToast === "function") {
-                window.showBioToast("🔓 Mở khóa bảng cấu hình thành công!");
+                window.showBioToast("🔓 Mở khóa thành công!");
             }
         } else {
             if (this.pwdError) {
@@ -172,6 +172,7 @@ class ConfigPanel {
     }
 
     switchTab(tabId) {
+        if (this.effectsEngine) this.effectsEngine.playClick();
         this.tabBtns.forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === tabId));
         this.tabPanes.forEach(p => p.classList.toggle("active", p.id === `tab-${tabId}`));
     }
@@ -187,27 +188,133 @@ class ConfigPanel {
         this.setVal("cfg-banner", cfg.profile.banner);
         this.setVal("cfg-location", cfg.profile.location);
         this.setVal("cfg-quotes", (cfg.profile.bioQuotes || []).join("\n"));
+        this.setVal("cfg-avatar-effect", cfg.theme.avatarEffect || "rainbow");
+        this.setVal("cfg-username-effect", cfg.theme.usernameEffect || "gradient");
 
         // Discord
         this.setVal("cfg-discord-user-id", cfg.discord.userId);
-        this.setVal("cfg-discord-client-id", cfg.auth.discordClientId);
         this.setCheck("cfg-discord-auto-sync", cfg.discord.autoSyncProfile);
         this.setCheck("cfg-discord-show-presence", cfg.discord.showPresence);
 
-        // Music
-        this.setVal("cfg-music-title", cfg.music.title);
-        this.setVal("cfg-music-artist", cfg.music.artist);
-        this.setVal("cfg-music-cover", cfg.music.cover);
-        this.setVal("cfg-music-src", cfg.music.src);
-
-        // Theme
+        // Theme & Effects
         this.setVal("cfg-theme-accent", cfg.theme.accentColor);
-        this.setVal("cfg-theme-bg-mode", cfg.theme.backgroundMode);
+        this.setVal("cfg-theme-bg-mode", cfg.theme.backgroundMode || "starfield");
         this.setVal("cfg-theme-bg-img", cfg.theme.backgroundImageUrl);
         this.setVal("cfg-theme-bg-vid", cfg.theme.backgroundVideoUrl);
+        this.setCheck("cfg-theme-scanlines", cfg.theme.scanlines !== false);
+        this.setCheck("cfg-theme-click-sound", cfg.theme.clickSound !== false);
+
+        // Badges Manager Checklist
+        this.renderBadgesChecklist();
 
         // Social links list editor
         this.renderSocialListEditor();
+
+        // Playlist Editor
+        this.renderPlaylistEditor();
+    }
+
+    renderBadgesChecklist() {
+        const container = document.getElementById("cfg-badges-checklist");
+        if (!container) return;
+
+        container.innerHTML = "";
+        const badges = this.currentConfig.badges || [];
+
+        badges.forEach((b, index) => {
+            const item = document.createElement("label");
+            item.className = "cfg-badge-toggle-item";
+            item.innerHTML = `
+                <input type="checkbox" data-index="${index}" ${b.enabled !== false ? "checked" : ""}>
+                <i class="${b.icon}" style="color: ${b.color}; margin-right: 6px;"></i>
+                <span>${b.name}</span>
+            `;
+            item.querySelector("input").addEventListener("change", (e) => {
+                badges[index].enabled = e.target.checked;
+                this.applyLiveChanges();
+            });
+            container.appendChild(item);
+        });
+    }
+
+    renderPlaylistEditor() {
+        const container = document.getElementById("cfg-playlist-editor");
+        if (!container) return;
+
+        container.innerHTML = "";
+        const list = (this.currentConfig.music && this.currentConfig.music.playlist) ? this.currentConfig.music.playlist : [];
+
+        list.forEach((track, idx) => {
+            const row = document.createElement("div");
+            row.className = "cfg-playlist-row";
+            row.innerHTML = `
+                <div class="playlist-row-info">
+                    <div class="playlist-track-title">#${idx + 1} ${track.title}</div>
+                    <div class="playlist-track-sub">${track.artist} (${track.type === "youtube" ? "YouTube" : "Audio"})</div>
+                </div>
+                <div class="playlist-row-actions">
+                    <button type="button" class="cfg-btn btn-play-track" data-index="${idx}" title="Phát bài này"><i class="fa-solid fa-play"></i></button>
+                    <button type="button" class="cfg-btn danger btn-del-track" data-index="${idx}" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+
+        container.querySelectorAll(".btn-play-track").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const idx = parseInt(btn.getAttribute("data-index"));
+                if (this.musicPlayer) {
+                    this.musicPlayer.currentIndex = idx;
+                    this.musicPlayer.loadTrack(list[idx]);
+                    this.musicPlayer.play();
+                }
+            });
+        });
+
+        container.querySelectorAll(".btn-del-track").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const idx = parseInt(btn.getAttribute("data-index"));
+                list.splice(idx, 1);
+                this.renderPlaylistEditor();
+                this.applyLiveChanges();
+            });
+        });
+    }
+
+    async handleFetchMusicUrl() {
+        const url = this.musicUrlInput.value.trim();
+        if (!url) {
+            alert("Vui lòng dán link YouTube hoặc MP3!");
+            return;
+        }
+
+        if (this.musicFetchBtn) this.musicFetchBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...`;
+
+        try {
+            const track = await MusicPlayer.fetchTrackMetadata(url);
+            if (track) {
+                if (!this.currentConfig.music.playlist) this.currentConfig.music.playlist = [];
+                this.currentConfig.music.playlist.push(track);
+                this.renderPlaylistEditor();
+                this.musicUrlInput.value = "";
+
+                // Tải và phát bài vừa thêm
+                if (this.musicPlayer) {
+                    this.musicPlayer.playlist = this.currentConfig.music.playlist;
+                    this.musicPlayer.currentIndex = this.currentConfig.music.playlist.length - 1;
+                    this.musicPlayer.loadTrack(track);
+                    this.musicPlayer.play();
+                }
+
+                if (typeof window.showBioToast === "function") {
+                    window.showBioToast(`🎵 Đã thêm bài hát: ${track.title}`);
+                }
+            }
+        } catch (e) {
+            alert("Không thể trích xuất bài hát từ link này. Hãy kiểm tra lại URL!");
+        } finally {
+            if (this.musicFetchBtn) this.musicFetchBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> Lấy & Thêm`;
+        }
     }
 
     renderSocialListEditor() {
@@ -229,9 +336,8 @@ class ConfigPanel {
             container.appendChild(row);
         });
 
-        // Gán sự kiện xóa
         container.querySelectorAll(".btn-del-social").forEach(btn => {
-            btn.addEventListener("click", (e) => {
+            btn.addEventListener("click", () => {
                 const idx = parseInt(btn.getAttribute("data-index"));
                 this.currentConfig.socials.splice(idx, 1);
                 this.renderSocialListEditor();
@@ -254,17 +360,29 @@ class ConfigPanel {
             this.currentConfig.profile.avatar = e.target.value;
             this.applyLiveChanges();
         });
+        listen("cfg-avatar-effect", "change", (e) => {
+            this.currentConfig.theme.avatarEffect = e.target.value;
+            this.applyLiveChanges();
+        });
+        listen("cfg-username-effect", "change", (e) => {
+            this.currentConfig.theme.usernameEffect = e.target.value;
+            this.applyLiveChanges();
+        });
+        listen("cfg-theme-bg-mode", "change", (e) => {
+            this.currentConfig.theme.backgroundMode = e.target.value;
+            if (this.effectsEngine) this.effectsEngine.setEffect(e.target.value);
+            this.applyLiveChanges();
+        });
         listen("cfg-theme-accent", "input", (e) => {
             this.currentConfig.theme.accentColor = e.target.value;
             this.applyLiveChanges();
         });
-        listen("cfg-music-title", "input", (e) => {
-            this.currentConfig.music.title = e.target.value;
-            if (this.musicPlayer) this.musicPlayer.loadTrack(this.currentConfig.music);
+        listen("cfg-theme-scanlines", "change", (e) => {
+            this.currentConfig.theme.scanlines = e.target.checked;
+            if (this.effectsEngine) this.effectsEngine.toggleScanlines(e.target.checked);
         });
-        listen("cfg-music-artist", "input", (e) => {
-            this.currentConfig.music.artist = e.target.value;
-            if (this.musicPlayer) this.musicPlayer.loadTrack(this.currentConfig.music);
+        listen("cfg-theme-click-sound", "change", (e) => {
+            this.currentConfig.theme.clickSound = e.target.checked;
         });
     }
 
@@ -273,7 +391,6 @@ class ConfigPanel {
         if (typeof window.renderBioProfile === "function") {
             window.renderBioProfile(this.currentConfig);
         }
-        // Cập nhật màu CSS variables
         if (this.currentConfig.theme && this.currentConfig.theme.accentColor) {
             document.documentElement.style.setProperty("--accent", this.currentConfig.theme.accentColor);
         }
@@ -315,7 +432,7 @@ class ConfigPanel {
                 }
             }
         } catch (e) {
-            alert("Không thể kết nối Discord User ID này. Hãy chắc chắn bạn đã tham gia server Lanyard (discord.gg/lanyard) hoặc ID chính xác.");
+            alert("Không thể kết nối Discord ID này. Hãy chắc chắn ID chính xác.");
         } finally {
             if (this.discordSyncBtn) this.discordSyncBtn.innerHTML = `<i class="fa-brands fa-discord"></i> Đồng bộ ngay`;
         }
@@ -331,21 +448,19 @@ class ConfigPanel {
         this.currentConfig.profile.bioQuotes = this.getVal("cfg-quotes").split("\n").filter(q => q.trim().length > 0);
 
         this.currentConfig.discord.userId = this.getVal("cfg-discord-user-id");
-        this.currentConfig.auth.discordClientId = this.getVal("cfg-discord-client-id");
         this.currentConfig.discord.autoSyncProfile = this.getCheck("cfg-discord-auto-sync");
         this.currentConfig.discord.showPresence = this.getCheck("cfg-discord-show-presence");
 
-        this.currentConfig.music.title = this.getVal("cfg-music-title");
-        this.currentConfig.music.artist = this.getVal("cfg-music-artist");
-        this.currentConfig.music.cover = this.getVal("cfg-music-cover");
-        this.currentConfig.music.src = this.getVal("cfg-music-src");
-
         this.currentConfig.theme.accentColor = this.getVal("cfg-theme-accent");
+        this.currentConfig.theme.avatarEffect = this.getVal("cfg-avatar-effect");
+        this.currentConfig.theme.usernameEffect = this.getVal("cfg-username-effect");
         this.currentConfig.theme.backgroundMode = this.getVal("cfg-theme-bg-mode");
         this.currentConfig.theme.backgroundImageUrl = this.getVal("cfg-theme-bg-img");
         this.currentConfig.theme.backgroundVideoUrl = this.getVal("cfg-theme-bg-vid");
+        this.currentConfig.theme.scanlines = this.getCheck("cfg-theme-scanlines");
+        this.currentConfig.theme.clickSound = this.getCheck("cfg-theme-click-sound");
 
-        // Đọc social list
+        // Socials
         const socialRows = document.querySelectorAll(".cfg-social-row");
         const newSocials = [];
         socialRows.forEach(row => {
@@ -363,7 +478,6 @@ class ConfigPanel {
         this.collectCurrentForm();
         localStorage.setItem("anklabo_bio_custom_config", JSON.stringify(this.currentConfig));
         this.applyLiveChanges();
-        if (this.musicPlayer) this.musicPlayer.loadTrack(this.currentConfig.music);
 
         if (typeof window.showBioToast === "function") {
             window.showBioToast("💾 Đã lưu cấu hình vào trình duyệt!");
@@ -401,7 +515,6 @@ if (typeof window !== "undefined") {
     resetConfig() {
         if (confirm("Bạn có chắc chắn muốn đặt lại toàn bộ cài đặt về mặc định ban đầu không?")) {
             localStorage.removeItem("anklabo_bio_custom_config");
-            localStorage.removeItem("anklabo_discord_synced_profile");
             window.location.reload();
         }
     }
