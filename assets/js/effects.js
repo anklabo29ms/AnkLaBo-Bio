@@ -1,264 +1,310 @@
 /**
- * Effects Engine for AnkLaBo Bio (guns.lol & zyo.lol Aesthetic)
- * Chứa các bộ hiệu ứng:
- * 1. Background Canvas: Starfield Warp, Matrix Rain, Snowfall, Cyber Embers
- * 2. Web Audio UI Sound Synthesizer: Mechanical / Cyber Click sound
- * 3. CRT Scanlines & Screen FX
+ * effects.js v3.0 — AnkLaBo Bio
+ * Canvas effects: Starfield Warp, Aurora/Nebula, Matrix Rain, Snowfall, Cyber Embers
+ * Also: CRT scanlines toggle, Web Audio mechanical click
  */
 
 class EffectsEngine {
     constructor() {
-        this.canvas = document.getElementById("bg-canvas");
-        this.ctx = this.canvas ? this.canvas.getContext("2d") : null;
-        this.currentMode = "starfield";
-        this.animationId = null;
-        this.particles = [];
-        this.width = 0;
-        this.height = 0;
-        this.audioCtx = null;
+        this._canvas    = document.getElementById("bg-canvas");
+        this._ctx       = this._canvas ? this._canvas.getContext("2d") : null;
+        this._raf       = null;
+        this._mode      = null;
+        this._particles = [];
+        this._time      = 0;
+        this._audioCtx  = null;
+        this._muted     = false;
 
-        if (this.canvas) {
-            this.initCanvas();
+        if (this._canvas) {
+            this._resize();
+            window.addEventListener("resize", () => this._resize());
         }
     }
 
-    initCanvas() {
-        this.resize();
-        window.addEventListener("resize", () => this.resize());
+    get W() { return this._canvas ? this._canvas.width  : window.innerWidth; }
+    get H() { return this._canvas ? this._canvas.height : window.innerHeight; }
+
+    _resize() {
+        if (!this._canvas) return;
+        this._canvas.width  = window.innerWidth;
+        this._canvas.height = window.innerHeight;
+        this._buildParticles(this._mode);
     }
 
-    resize() {
-        if (!this.canvas) return;
-        this.width = this.canvas.width = window.innerWidth;
-        this.height = this.canvas.height = window.innerHeight;
-        this.initParticles(this.currentMode);
-    }
+    /* ---- Public API ---- */
 
     setEffect(mode) {
-        this.currentMode = mode || "starfield";
-        if (this.animationId) cancelAnimationFrame(this.animationId);
-        this.initParticles(this.currentMode);
-        this.startAnimation();
-    }
-
-    initParticles(mode) {
-        this.particles = [];
-        const accent = (window.CONFIG && window.CONFIG.theme && window.CONFIG.theme.accentColor) || "#8b5cf6";
-
-        if (mode === "starfield") {
-            const count = Math.min(180, Math.floor((this.width * this.height) / 8000));
-            for (let i = 0; i < count; i++) {
-                this.particles.push({
-                    x: (Math.random() - 0.5) * this.width * 2,
-                    y: (Math.random() - 0.5) * this.height * 2,
-                    z: Math.random() * this.width,
-                    pz: 0
-                });
-            }
-        } else if (mode === "matrix") {
-            const fontSize = 14;
-            const columns = Math.floor(this.width / fontSize);
-            this.matrixDrops = [];
-            for (let i = 0; i < columns; i++) {
-                this.matrixDrops[i] = Math.floor(Math.random() * -50);
-            }
-        } else if (mode === "snow") {
-            const count = Math.min(100, Math.floor((this.width * this.height) / 10000));
-            for (let i = 0; i < count; i++) {
-                this.particles.push({
-                    x: Math.random() * this.width,
-                    y: Math.random() * this.height,
-                    radius: Math.random() * 2.5 + 0.8,
-                    speedY: Math.random() * 1.2 + 0.6,
-                    speedX: Math.random() * 0.6 - 0.3,
-                    alpha: Math.random() * 0.6 + 0.3,
-                    swing: Math.random() * Math.PI * 2
-                });
-            }
-        } else if (mode === "embers") {
-            const count = Math.min(80, Math.floor((this.width * this.height) / 12000));
-            for (let i = 0; i < count; i++) {
-                this.particles.push({
-                    x: Math.random() * this.width,
-                    y: Math.random() * this.height,
-                    radius: Math.random() * 2 + 1,
-                    speedY: -(Math.random() * 1.5 + 0.5),
-                    speedX: (Math.random() - 0.5) * 0.8,
-                    alpha: Math.random() * 0.7 + 0.3,
-                    life: Math.random() * 100
-                });
-            }
+        this._mode = mode;
+        cancelAnimationFrame(this._raf);
+        if (!this._ctx || mode === "none") {
+            if (this._ctx) this._ctx.clearRect(0, 0, this.W, this.H);
+            return;
         }
+        this._buildParticles(mode);
+        this._loop(mode);
     }
 
-    startAnimation() {
-        const loop = () => {
-            this.animationId = requestAnimationFrame(loop);
-            this.draw();
-        };
-        loop();
+    toggleScanlines(on) {
+        const el = document.getElementById("crt-scanlines-layer");
+        if (el) el.style.display = on ? "block" : "none";
     }
 
-    draw() {
-        if (!this.ctx) return;
-        const ctx = this.ctx;
-        const w = this.width;
-        const h = this.height;
-        const accent = (window.CONFIG && window.CONFIG.theme && window.CONFIG.theme.accentColor) || "#8b5cf6";
-
-        if (this.currentMode === "starfield") {
-            ctx.fillStyle = "rgba(9, 9, 11, 0.35)";
-            ctx.fillRect(0, 0, w, h);
-
-            const cx = w / 2;
-            const cy = h / 2;
-
-            for (let i = 0; i < this.particles.length; i++) {
-                const p = this.particles[i];
-                p.pz = p.z;
-                p.z -= 4;
-
-                if (p.z <= 0) {
-                    p.x = (Math.random() - 0.5) * w * 2;
-                    p.y = (Math.random() - 0.5) * h * 2;
-                    p.z = w;
-                    p.pz = p.z;
-                }
-
-                const k = 250 / p.z;
-                const px = p.x * k + cx;
-                const py = p.y * k + cy;
-
-                const prevK = 250 / p.pz;
-                const prevPx = p.x * prevK + cx;
-                const prevPy = p.y * prevK + cy;
-
-                if (px >= 0 && px <= w && py >= 0 && py <= h) {
-                    const size = Math.max(0.5, (1 - p.z / w) * 2.2);
-                    ctx.beginPath();
-                    ctx.moveTo(prevPx, prevPy);
-                    ctx.lineTo(px, py);
-                    ctx.strokeStyle = `rgba(216, 180, 254, ${(1 - p.z / w) * 0.9})`;
-                    ctx.lineWidth = size;
-                    ctx.stroke();
-                }
-            }
-        } else if (this.currentMode === "matrix") {
-            ctx.fillStyle = "rgba(9, 9, 11, 0.12)";
-            ctx.fillRect(0, 0, w, h);
-
-            ctx.fillStyle = accent;
-            ctx.font = "14px 'JetBrains Mono', monospace";
-
-            const chars = "ｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ1234567890ABCDEF";
-            for (let i = 0; i < this.matrixDrops.length; i++) {
-                const text = chars[Math.floor(Math.random() * chars.length)];
-                const x = i * 14;
-                const y = this.matrixDrops[i] * 14;
-
-                // Chữ sáng ở đầu dòng
-                ctx.fillStyle = "#ffffff";
-                ctx.fillText(text, x, y);
-
-                ctx.fillStyle = accent;
-                ctx.fillText(text, x, y - 14);
-
-                if (y > h && Math.random() > 0.975) {
-                    this.matrixDrops[i] = 0;
-                }
-                this.matrixDrops[i]++;
-            }
-        } else if (this.currentMode === "snow") {
-            ctx.clearRect(0, 0, w, h);
-
-            for (let i = 0; i < this.particles.length; i++) {
-                const p = this.particles[i];
-                p.y += p.speedY;
-                p.swing += 0.02;
-                p.x += Math.sin(p.swing) * 0.5 + p.speedX;
-
-                if (p.y > h) {
-                    p.y = -10;
-                    p.x = Math.random() * w;
-                }
-                if (p.x > w) p.x = 0;
-                if (p.x < 0) p.x = w;
-
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
-                ctx.shadowBlur = 4;
-                ctx.shadowColor = "#ffffff";
-                ctx.fill();
-            }
-        } else if (this.currentMode === "embers") {
-            ctx.clearRect(0, 0, w, h);
-
-            for (let i = 0; i < this.particles.length; i++) {
-                const p = this.particles[i];
-                p.y += p.speedY;
-                p.x += p.speedX + Math.sin(p.life * 0.05) * 0.3;
-                p.life += 1;
-
-                if (p.y < -10) {
-                    p.y = h + 10;
-                    p.x = Math.random() * w;
-                    p.life = 0;
-                }
-
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fillStyle = accent;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = accent;
-                ctx.fill();
-            }
-        }
-    }
-
-    /**
-     * Bộ tạo âm thanh click UI bằng Web Audio API thuần
-     */
     playClick() {
-        if (!window.CONFIG || !window.CONFIG.theme || window.CONFIG.theme.clickSound === false) return;
-
+        if (this._muted) return;
+        if (!window.CONFIG || window.CONFIG.theme.clickSound === false) return;
         try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-            if (!this.audioCtx) this.audioCtx = new AudioCtx();
-            if (this.audioCtx.state === "suspended") this.audioCtx.resume();
-
-            const osc = this.audioCtx.createOscillator();
-            const gain = this.audioCtx.createGain();
-
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(950, this.audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(220, this.audioCtx.currentTime + 0.035);
-
-            gain.gain.setValueAtTime(0.08, this.audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.035);
-
-            osc.connect(gain);
-            gain.connect(this.audioCtx.destination);
-
-            osc.start();
-            osc.stop(this.audioCtx.currentTime + 0.038);
-        } catch (e) {}
+            if (!this._audioCtx) {
+                this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const ac  = this._audioCtx;
+            const buf = ac.createBuffer(1, ac.sampleRate * 0.03, ac.sampleRate);
+            const ch  = buf.getChannelData(0);
+            for (let i = 0; i < ch.length; i++) {
+                ch[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ac.sampleRate * 0.012));
+            }
+            const src  = ac.createBufferSource();
+            const gain = ac.createGain();
+            src.buffer = buf;
+            gain.gain.setValueAtTime(0.18, ac.currentTime);
+            src.connect(gain);
+            gain.connect(ac.destination);
+            src.start();
+        } catch (e) { /* AudioContext not available */ }
     }
 
-    /**
-     * Bật/tắt dải quét CRT Scanlines
-     */
-    toggleScanlines(enable) {
-        let el = document.getElementById("crt-scanlines-layer");
-        if (!el && enable) {
-            el = document.createElement("div");
-            el.id = "crt-scanlines-layer";
-            el.className = "crt-scanlines";
-            document.body.appendChild(el);
+    /* ---- Particle builders ---- */
+
+    _buildParticles(mode) {
+        const W = this.W, H = this.H;
+        this._particles = [];
+        this._time = 0;
+
+        switch (mode) {
+            case "starfield":
+                for (let i = 0; i < 220; i++) {
+                    this._particles.push({
+                        x:     Math.random() * W - W / 2,
+                        y:     Math.random() * H - H / 2,
+                        z:     Math.random() * W,
+                        px: 0, py: 0
+                    });
+                }
+                break;
+
+            case "aurora":
+                // Bands pre-computed on first render; no static particles needed
+                break;
+
+            case "matrix":
+                const cols = Math.floor(W / 16);
+                for (let i = 0; i < cols; i++) {
+                    this._particles.push({
+                        x:     i * 16,
+                        y:     Math.random() * H,
+                        speed: Math.random() * 1.2 + 0.6,
+                        chars: "01ABCDEFウォカコクコランダ".split("")
+                    });
+                }
+                break;
+
+            case "snow":
+                for (let i = 0; i < 160; i++) {
+                    this._particles.push({
+                        x:     Math.random() * W,
+                        y:     Math.random() * H,
+                        r:     Math.random() * 2.5 + 0.5,
+                        vx:    (Math.random() - .5) * 0.5,
+                        vy:    Math.random() * 0.8 + 0.3,
+                        alpha: Math.random() * 0.5 + 0.2
+                    });
+                }
+                break;
+
+            case "embers":
+                for (let i = 0; i < 120; i++) {
+                    this._particles.push({
+                        x:     Math.random() * W,
+                        y:     H + Math.random() * 80,
+                        vx:    (Math.random() - .5) * 1.2,
+                        vy:    -(Math.random() * 1.5 + 0.5),
+                        life:  Math.random(),
+                        maxL:  Math.random() * 0.6 + 0.4,
+                        r:     Math.random() * 2 + 1
+                    });
+                }
+                break;
         }
-        if (el) {
-            el.style.display = enable ? "block" : "none";
+    }
+
+    /* ---- Main animation loop ---- */
+
+    _loop(mode) {
+        const ctx = this._ctx;
+        const tick = () => {
+            this._raf = requestAnimationFrame(tick);
+            this._time += 0.008;
+            switch (mode) {
+                case "starfield": this._renderStarfield(ctx); break;
+                case "aurora":    this._renderAurora(ctx);    break;
+                case "matrix":    this._renderMatrix(ctx);    break;
+                case "snow":      this._renderSnow(ctx);      break;
+                case "embers":    this._renderEmbers(ctx);    break;
+            }
+        };
+        tick();
+    }
+
+    /* ---- STARFIELD WARP 3D ---- */
+    _renderStarfield(ctx) {
+        const W = this.W, H = this.H;
+        const speed = 12;
+        ctx.fillStyle = "rgba(8,8,16,0.35)";
+        ctx.fillRect(0, 0, W, H);
+        const cx = W / 2, cy = H / 2;
+
+        for (const s of this._particles) {
+            s.px = cx + (s.x / s.z) * W;
+            s.py = cy + (s.y / s.z) * H;
+            s.z -= speed;
+            if (s.z <= 0) { s.z = W; s.x = Math.random() * W - cx; s.y = Math.random() * H - cy; }
+
+            const nx   = cx + (s.x / s.z) * W;
+            const ny   = cy + (s.y / s.z) * H;
+            const size = Math.max(0, (1 - s.z / W) * 2.2);
+            const br   = 1 - s.z / W;
+
+            ctx.beginPath();
+            ctx.moveTo(s.px, s.py);
+            ctx.lineTo(nx, ny);
+            ctx.strokeStyle = `rgba(${Math.floor(180 + br * 75)},${Math.floor(160 + br * 60)},255,${br * 0.85})`;
+            ctx.lineWidth   = size;
+            ctx.stroke();
+        }
+    }
+
+    /* ---- AURORA / NEBULA ---- */
+    _renderAurora(ctx) {
+        const W = this.W, H = this.H, t = this._time;
+        ctx.clearRect(0, 0, W, H);
+
+        const bands = [
+            { r:139, g:92,  b:246, phase: 0     },   // purple
+            { r:6,   g:182, b:212, phase: 2.1   },   // cyan
+            { r:236, g:72,  b:153, phase: 4.2   },   // pink
+            { r:16,  g:185, b:129, phase: 1.05  },   // emerald
+            { r:245, g:158, b:11,  phase: 3.14  },   // amber (subtle)
+        ];
+
+        for (const band of bands) {
+            const grad = ctx.createLinearGradient(0, H * 0.1, 0, H * 0.9);
+            const [r,g,b] = [band.r, band.g, band.b];
+            grad.addColorStop(0,   `rgba(${r},${g},${b},0)`);
+            grad.addColorStop(0.45,`rgba(${r},${g},${b},0.12)`);
+            grad.addColorStop(0.55,`rgba(${r},${g},${b},0.12)`);
+            grad.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+
+            ctx.beginPath();
+            ctx.moveTo(0, H / 2);
+
+            for (let x = 0; x <= W; x += 5) {
+                const y = H / 2
+                    + Math.sin(x * 0.005 + t * 0.35 + band.phase) * (H * 0.22)
+                    + Math.sin(x * 0.013 + t * 0.18 + band.phase * 1.4) * (H * 0.1);
+                x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+
+            ctx.lineTo(W, H);
+            ctx.lineTo(0, H);
+            ctx.closePath();
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        // Slow-moving nebula glow points
+        for (let i = 0; i < 3; i++) {
+            const x = W * (0.2 + 0.6 * Math.abs(Math.sin(t * 0.08 + i * 2.1)));
+            const y = H * (0.3 + 0.4 * Math.abs(Math.sin(t * 0.06 + i * 1.5)));
+            const g = ctx.createRadialGradient(x, y, 0, x, y, W * 0.3);
+            const colors = [[139,92,246],[6,182,212],[236,72,153]];
+            const [cr,cg,cb] = colors[i % colors.length];
+            g.addColorStop(0,   `rgba(${cr},${cg},${cb},0.12)`);
+            g.addColorStop(1,   `rgba(${cr},${cg},${cb},0)`);
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+        }
+    }
+
+    /* ---- MATRIX RAIN ---- */
+    _renderMatrix(ctx) {
+        const W = this.W, H = this.H;
+        ctx.fillStyle = "rgba(8,8,16,0.1)";
+        ctx.fillRect(0, 0, W, H);
+        ctx.font      = "14px 'JetBrains Mono', monospace";
+        ctx.fillStyle = "#00ff41";
+
+        for (const col of this._particles) {
+            const ch = col.chars[Math.floor(Math.random() * col.chars.length)];
+            ctx.fillStyle = col.y < 40
+                ? "rgba(180,255,180,0.95)"
+                : `rgba(0,${Math.floor(120 + col.y / H * 135)},65,0.85)`;
+            ctx.fillText(ch, col.x, col.y);
+            col.y += col.speed * 14;
+            if (col.y > H + 20) col.y = -14;
+        }
+    }
+
+    /* ---- SNOWFALL ---- */
+    _renderSnow(ctx) {
+        const W = this.W, H = this.H;
+        ctx.clearRect(0, 0, W, H);
+
+        for (const p of this._particles) {
+            p.x  = (p.x + p.vx + W) % W;
+            p.y += p.vy;
+            p.vx += (Math.random() - .5) * 0.05;
+            if (p.y > H + 5) { p.y = -5; p.x = Math.random() * W; }
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(220,230,255,${p.alpha})`;
+            ctx.fill();
+        }
+    }
+
+    /* ---- CYBER EMBERS ---- */
+    _renderEmbers(ctx) {
+        const W = this.W, H = this.H;
+        ctx.clearRect(0, 0, W, H);
+
+        for (const p of this._particles) {
+            p.life -= 0.004;
+            if (p.life <= 0) {
+                Object.assign(p, {
+                    x:    Math.random() * W,
+                    y:    H + 10,
+                    vx:   (Math.random() - .5) * 1.2,
+                    vy:   -(Math.random() * 1.5 + 0.5),
+                    life: Math.random() * 0.5 + 0.5,
+                    maxL: 1
+                });
+            }
+
+            p.x  += p.vx;
+            p.y  += p.vy;
+            p.vx *= 0.99;
+
+            const al = p.life / p.maxL;
+            const h  = 280 + (1 - al) * 60;  // purple → pink/red
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${h},100%,70%,${al * 0.75})`;
+            ctx.fill();
+
+            // Ember trail glow
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${h},100%,70%,${al * 0.12})`;
+            ctx.fill();
         }
     }
 }
