@@ -1,498 +1,609 @@
 /**
- * Main Controller for AnkLaBo Bio
- * Điều khiển Màn hình Enter, Badge Tooltip Bar, View Counter thật, Typewriter, Tilt & Effects
+ * main.js v3.0 — AnkLaBo Bio
+ * Fixes: single typewriter instance, cursor centering, banner/no-banner layout,
+ *        card glare mouse tracking, avatar decoration render, enter particles,
+ *        badge CDN image support, sparkle toggle, real view counter.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Tải cấu hình đã lưu nếu có
-    const savedConfig = localStorage.getItem("anklabo_bio_custom_config");
-    if (savedConfig) {
-        try {
-            window.CONFIG = Object.assign({}, window.CONFIG, JSON.parse(savedConfig));
-        } catch (e) {}
-    }
 
-    // 2. Khởi tạo các module
-    const effectsEngine = new window.EffectsEngine();
-    const auth = new window.BioAuth(window.CONFIG);
-    const musicPlayer = new window.MusicPlayer(window.CONFIG);
-    
-    // Discord Manager (Lanyard User ID sync)
+    /* 1. Merge saved local config */
+    try {
+        const saved = localStorage.getItem("anklabo_bio_custom_config");
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Deep-merge top-level sections only
+            Object.keys(parsed).forEach(k => {
+                if (typeof parsed[k] === "object" && !Array.isArray(parsed[k])) {
+                    window.CONFIG[k] = Object.assign({}, window.CONFIG[k] || {}, parsed[k]);
+                } else {
+                    window.CONFIG[k] = parsed[k];
+                }
+            });
+        }
+    } catch (e) { /* ignore */ }
+
+    const CFG = window.CONFIG;
+
+    /* 2. Instantiate modules */
+    const effectsEngine  = new window.EffectsEngine();
+    const auth           = new window.BioAuth(CFG);
+    const musicPlayer    = new window.MusicPlayer(CFG);
     const discordManager = new window.DiscordManager(
-        window.CONFIG,
-        (profileUpdate) => handleDiscordProfileUpdate(profileUpdate),
-        (presenceUpdate) => handleDiscordPresenceUpdate(presenceUpdate)
+        CFG,
+        (profileData)  => handleDiscordProfile(profileData),
+        (presenceData) => handleDiscordPresence(presenceData)
     );
+    new window.ConfigPanel(auth, discordManager, musicPlayer, effectsEngine);
 
-    // Config Panel
-    const configPanel = new window.ConfigPanel(auth, discordManager, musicPlayer, effectsEngine);
+    /* 3. Render initial UI */
+    renderBioProfile(CFG);
 
-    // 3. Render giao diện Bio
-    renderBioProfile(window.CONFIG);
+    /* 4. Background effect */
+    effectsEngine.setEffect(CFG.theme.backgroundMode || "starfield");
+    effectsEngine.toggleScanlines(CFG.theme.scanlines !== false);
 
-    // 4. Kích hoạt hiệu ứng nền đã chọn
-    if (effectsEngine && window.CONFIG.theme && window.CONFIG.theme.backgroundMode) {
-        effectsEngine.setEffect(window.CONFIG.theme.backgroundMode);
-        effectsEngine.toggleScanlines(window.CONFIG.theme.scanlines !== false);
-    }
-
-    // 5. Màn hình chờ "Click to enter"
+    /* 5. Enter screen */
     initEnterScreen(musicPlayer, effectsEngine);
 
-    // 6. Hiệu ứng gõ chữ (Typewriter)
-    initTypewriter(window.CONFIG.profile.bioQuotes);
+    /* 6. Typewriter — single timer instance (fix: no duplicate timers on re-render) */
+    window._typewriterRunning = false;
+    startTypewriter(CFG.profile.bioQuotes);
 
-    // 7. Hiệu ứng nghiêng 3D (Parallax Card Tilt)
+    /* 7. Card tilt & glare */
     initCardTilt();
+    initCardGlare();
 
-    // 8. Con trỏ chuột neon & Sparkle Trail
-    initCustomCursor();
+    /* 8. Custom cursor */
+    initCustomCursor(CFG);
 
-    // 9. Bộ đếm lượt xem THẬT (Real Server View Counter)
-    initRealViewCounter();
+    /* 9. Real view counter */
+    initRealViewCounter(CFG);
 
-    // 10. Gán âm thanh click UI
-    initClickSounds(effectsEngine);
-});
-
-/**
- * Render toàn bộ thông tin Bio từ CONFIG
- */
-function renderBioProfile(config) {
-    if (!config) return;
-
-    // Màu chủ đạo
-    if (config.theme && config.theme.accentColor) {
-        document.documentElement.style.setProperty("--accent", config.theme.accentColor);
-        document.documentElement.style.setProperty("--accent-glow", config.theme.glowColor || "rgba(139, 92, 246, 0.45)");
+    /* 10. Lanyard Discord sync */
+    if (CFG.discord.userId) {
+        discordManager.initLanyard(CFG.discord.userId);
     }
 
-    // Banner & Avatar
-    const bannerEl = document.getElementById("profile-banner");
-    if (bannerEl) {
-        if (config.profile.banner) {
-            bannerEl.style.backgroundImage = `url('${config.profile.banner}')`;
-            bannerEl.style.display = "block";
+    /* 11. Enter-screen particle canvas */
+    initEnterParticles();
+});
+
+/* =========================================================
+   RENDER BIO PROFILE
+   ========================================================= */
+function renderBioProfile(cfg) {
+    if (!cfg) return;
+
+    // Accent colour
+    if (cfg.theme.accentColor) {
+        document.documentElement.style.setProperty("--accent",      cfg.theme.accentColor);
+        document.documentElement.style.setProperty("--accent-glow", cfg.theme.glowColor || "rgba(139,92,246,.42)");
+    }
+
+    // Banner
+    const card      = document.getElementById("profile-card");
+    const bannerEl  = document.getElementById("profile-banner");
+    if (bannerEl && card) {
+        if (cfg.profile.banner) {
+            bannerEl.style.backgroundImage = `url('${cfg.profile.banner}')`;
+            card.classList.remove("no-banner");
         } else {
-            bannerEl.style.display = "none";
+            bannerEl.style.backgroundImage = "";
+            card.classList.add("no-banner");
         }
     }
 
+    // Avatar
     const avatarEl = document.getElementById("profile-avatar-img");
-    if (avatarEl && config.profile.avatar) {
-        avatarEl.src = config.profile.avatar;
-    }
+    if (avatarEl && cfg.profile.avatar) avatarEl.src = cfg.profile.avatar;
 
-    // Hiệu ứng viền Avatar
-    const avatarRing = document.getElementById("profile-avatar-ring");
-    if (avatarRing && config.theme) {
-        avatarRing.className = `avatar-ring ${config.theme.avatarEffect || "rainbow"}`;
-    }
+    // Enter screen avatar sync
+    const enterAv = document.getElementById("enter-avatar");
+    if (enterAv && cfg.profile.avatar) enterAv.src = cfg.profile.avatar;
 
-    // Tên & Handle & UID
+    // Avatar ring effect
+    const ringEl = document.getElementById("profile-avatar-ring");
+    if (ringEl) ringEl.className = `avatar-ring ${cfg.theme.avatarEffect || "rainbow"}`;
+
+    // Username
     const nameEl = document.getElementById("profile-name");
     if (nameEl) {
-        nameEl.textContent = config.profile.username || "AnkLaBo";
-        nameEl.className = `username ${config.theme.usernameEffect || "gradient"}`;
+        nameEl.textContent = cfg.profile.username || "AnkLaBo";
+        nameEl.className   = `username ${cfg.theme.usernameEffect || "gradient"}`;
     }
 
+    // Handle
     const handleEl = document.getElementById("profile-handle");
-    if (handleEl) handleEl.textContent = `@${config.profile.handle || "anklabo29ms"}`;
+    if (handleEl) handleEl.textContent = `@${cfg.profile.handle || "anklabo29ms"}`;
 
+    // UID
     const uidEl = document.getElementById("profile-uid");
-    if (uidEl) uidEl.textContent = `UID: ${config.profile.uid || "1"}`;
-
-    const locationEl = document.getElementById("profile-location");
-    if (locationEl) {
-        locationEl.textContent = config.profile.location || "Vietnam";
+    if (uidEl) {
+        const span = uidEl.querySelector("span");
+        if (span) span.textContent = cfg.profile.uid || "1";
     }
 
-    // Render Badges & Gắn tương tác thông minh cho Tooltip Bar
-    renderBadgesWithSmartTooltip(config.badges || []);
-
-    // Social Links
-    const socialsContainer = document.getElementById("profile-socials");
-    if (socialsContainer) {
-        socialsContainer.innerHTML = "";
-        const socials = config.socials || [];
-        socials.forEach(item => {
-            const a = document.createElement("a");
-            a.className = "social-btn";
-            a.href = item.url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.setAttribute("data-tooltip", item.tooltip || item.name);
-            a.style.setProperty("--hover-color", item.color || "#fff");
-            a.innerHTML = `<i class="${item.icon}"></i>`;
-            socialsContainer.appendChild(a);
-        });
+    // Location
+    const locEl = document.getElementById("profile-location");
+    if (locEl) {
+        const span = locEl.querySelector("span");
+        if (span) span.textContent = cfg.profile.location || "Vietnam";
     }
 
-    // Background Image
-    const bgImageEl = document.getElementById("bg-image-layer");
-    if (bgImageEl && config.theme.backgroundImageUrl) {
-        bgImageEl.style.backgroundImage = `url('${config.theme.backgroundImageUrl}')`;
+    // Badges
+    renderBadgesWithSmartTooltip(cfg.badges || []);
+
+    // Social links
+    renderSocialLinks(cfg.socials || []);
+
+    // Background image layer
+    const bgImg = document.getElementById("bg-image-layer");
+    if (bgImg && cfg.theme.backgroundImageUrl) {
+        bgImg.style.backgroundImage = `url('${cfg.theme.backgroundImageUrl}')`;
     }
+
+    // Typewriter quotes (restart only if quotes changed)
+    startTypewriter(cfg.profile.bioQuotes);
 }
 window.renderBioProfile = renderBioProfile;
 
-/**
- * Render Badges và xử lý thanh chú thích thông minh không bị che bởi Avatar
- */
+/* =========================================================
+   BADGES — supports type:"img" (Discord CDN) and type:"fa"
+   ========================================================= */
 function renderBadgesWithSmartTooltip(badges) {
-    const badgesContainer = document.getElementById("profile-badges");
+    const container  = document.getElementById("profile-badges");
     const tooltipBar = document.getElementById("badge-tooltip-bar");
-    if (!badgesContainer || !tooltipBar) return;
+    if (!container || !tooltipBar) return;
 
-    badgesContainer.innerHTML = "";
-    const activeBadges = badges.filter(b => b.enabled !== false);
+    container.innerHTML = "";
+    const active = badges.filter(b => b.enabled !== false);
 
-    activeBadges.forEach((badge, index) => {
-        const badgeEl = document.createElement("div");
-        badgeEl.className = "bio-badge";
-        badgeEl.setAttribute("data-index", index);
-        badgeEl.innerHTML = `<i class="${badge.icon}" style="color: ${badge.color}"></i>`;
+    active.forEach(badge => {
+        const el = document.createElement("div");
+        el.className = "bio-badge";
 
-        // Sự kiện chuột trên Desktop
-        badgeEl.addEventListener("mouseenter", () => showBadgeTooltip(badge, badgeEl));
-        badgeEl.addEventListener("mouseleave", () => hideBadgeTooltip());
+        if (badge.type === "img") {
+            const img  = document.createElement("img");
+            img.src    = badge.icon;
+            img.alt    = badge.name;
+            img.className = "badge-img";
+            img.onerror = () => {
+                // Fallback to Discord blurple icon if CDN fails
+                img.src = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='12' fill='%235865f2'/></svg>`;
+            };
+            el.appendChild(img);
+        } else {
+            el.innerHTML = `<i class="${badge.icon}" style="color:${badge.color}"></i>`;
+        }
 
-        // Sự kiện chạm trên Mobile
-        badgeEl.addEventListener("click", (e) => {
+        // Desktop hover
+        el.addEventListener("mouseenter", () => showBadgeTooltip(badge, el));
+        el.addEventListener("mouseleave", hideBadgeTooltip);
+        // Mobile tap
+        el.addEventListener("click", (e) => {
             e.stopPropagation();
-            showBadgeTooltip(badge, badgeEl);
+            showBadgeTooltip(badge, el);
         });
 
-        badgesContainer.appendChild(badgeEl);
+        container.appendChild(el);
     });
 
-    // Chạm ra ngoài thì ẩn tooltip
-    document.addEventListener("click", () => hideBadgeTooltip());
+    // Dismiss on outside click
+    document.addEventListener("click", hideBadgeTooltip);
 }
 
-let tooltipTimeout = null;
-function showBadgeTooltip(badge, badgeEl) {
-    const tooltipBar = document.getElementById("badge-tooltip-bar");
-    if (!tooltipBar) return;
-
-    if (tooltipTimeout) clearTimeout(tooltipTimeout);
-
-    // Bỏ active cũ
+let _tooltipTimer = null;
+function showBadgeTooltip(badge, triggerEl) {
+    const bar = document.getElementById("badge-tooltip-bar");
+    if (!bar) return;
+    clearTimeout(_tooltipTimer);
     document.querySelectorAll(".bio-badge").forEach(b => b.classList.remove("active-badge"));
-    badgeEl.classList.add("active-badge");
+    triggerEl.classList.add("active-badge");
 
-    tooltipBar.innerHTML = `
+    let iconHtml;
+    if (badge.type === "img") {
+        iconHtml = `<img src="${badge.icon}" class="tooltip-badge-img" alt="">`;
+    } else {
+        iconHtml = `<span class="tooltip-icon"><i class="${badge.icon}" style="color:${badge.color}"></i></span>`;
+    }
+
+    bar.innerHTML = `
         <div class="tooltip-bar-content">
-            <span class="tooltip-icon"><i class="${badge.icon}" style="color: ${badge.color}"></i></span>
+            ${iconHtml}
             <span class="tooltip-title">${badge.name}</span>
             <span class="tooltip-sep">•</span>
             <span class="tooltip-desc">${badge.tooltip || badge.name}</span>
-        </div>
-    `;
-    tooltipBar.classList.add("visible");
+        </div>`;
+    bar.classList.add("visible");
 }
 
 function hideBadgeTooltip() {
-    const tooltipBar = document.getElementById("badge-tooltip-bar");
-    if (!tooltipBar) return;
-
-    tooltipTimeout = setTimeout(() => {
-        tooltipBar.classList.remove("visible");
+    _tooltipTimer = setTimeout(() => {
+        const bar = document.getElementById("badge-tooltip-bar");
+        if (bar) bar.classList.remove("visible");
         document.querySelectorAll(".bio-badge").forEach(b => b.classList.remove("active-badge"));
-    }, 200);
+    }, 180);
 }
 
-/**
- * Xử lý cập nhật Discord Profile
- */
-function handleDiscordProfileUpdate(profile) {
-    if (!profile) return;
-    if (profile.avatar) {
-        const avatarEl = document.getElementById("profile-avatar-img");
-        if (avatarEl) avatarEl.src = profile.avatar;
+/* =========================================================
+   SOCIAL LINKS — pill with icon + label
+   ========================================================= */
+function renderSocialLinks(socials) {
+    const container = document.getElementById("profile-socials");
+    if (!container) return;
+    container.innerHTML = "";
+    socials.forEach(item => {
+        const a       = document.createElement("a");
+        a.className   = "social-btn";
+        a.href        = item.url;
+        a.target      = "_blank";
+        a.rel         = "noopener noreferrer";
+        a.style.setProperty("--s-color", item.color || "#fff");
+        a.innerHTML   = `<i class="${item.icon}"></i>${item.label ? `<span class="social-label">${item.label}</span>` : ""}`;
+        container.appendChild(a);
+    });
+}
+
+/* =========================================================
+   DISCORD PROFILE UPDATE (avatar, banner, decoration)
+   ========================================================= */
+function handleDiscordProfile(data) {
+    if (!data) return;
+
+    if (data.avatar) {
+        const img = document.getElementById("profile-avatar-img");
+        const ea  = document.getElementById("enter-avatar");
+        if (img) img.src = data.avatar;
+        if (ea)  ea.src  = data.avatar;
     }
-    if (profile.banner) {
+
+    if (data.banner) {
         const bannerEl = document.getElementById("profile-banner");
+        const card     = document.getElementById("profile-card");
         if (bannerEl) {
-            bannerEl.style.backgroundImage = `url('${profile.banner}')`;
-            bannerEl.style.display = "block";
+            bannerEl.style.backgroundImage = `url('${data.banner}')`;
+            card && card.classList.remove("no-banner");
         }
     }
-    if (profile.username) {
-        const nameEl = document.getElementById("profile-name");
-        if (nameEl) nameEl.textContent = profile.username;
+
+    // Avatar Decoration overlay
+    const decorEl = document.getElementById("avatar-decoration");
+    if (decorEl) {
+        if (data.decoration) {
+            decorEl.src = data.decoration;
+            decorEl.classList.add("loaded");
+            decorEl.onerror = () => decorEl.classList.remove("loaded");
+        } else {
+            decorEl.classList.remove("loaded");
+        }
+    }
+
+    if (data.username) {
+        const n = document.getElementById("profile-name");
+        if (n) n.textContent = data.username;
     }
 }
 
-/**
- * Xử lý cập nhật Discord Presence (Spotify / Game)
- */
-function handleDiscordPresenceUpdate(presence) {
-    if (!presence) return;
-
-    const statusDot = document.getElementById("profile-status-dot");
-    if (statusDot) {
-        statusDot.className = `status-dot ${presence.status}`;
-        const statusNames = {
-            online: "Trực tuyến",
-            idle: "Vắng mặt",
-            dnd: "Đừng làm phiền",
-            offline: "Ngoại tuyến"
-        };
-        statusDot.setAttribute("data-tooltip", statusNames[presence.status] || presence.status);
+/* =========================================================
+   DISCORD PRESENCE (Spotify / Game / Custom Status)
+   ========================================================= */
+function handleDiscordPresence(presence) {
+    // Status dot
+    const dot = document.getElementById("profile-status-dot");
+    if (dot) {
+        const statusNames = { online: "Trực tuyến", idle: "Vắng mặt", dnd: "Đừng làm phiền", offline: "Ngoại tuyến" };
+        const s = presence ? presence.status : "offline";
+        dot.className = `status-dot ${s}`;
+        dot.setAttribute("data-tooltip", statusNames[s] || s);
     }
 
-    const presenceBox = document.getElementById("discord-presence-box");
-    if (!presenceBox) return;
+    const box = document.getElementById("discord-presence-box");
+    if (!box || !presence) { if (box) box.style.display = "none"; return; }
 
     if (presence.spotify) {
-        presenceBox.style.display = "flex";
-        presenceBox.className = "discord-presence-box spotify-active";
-        presenceBox.innerHTML = `
-            <div class="presence-icon"><i class="fa-brands fa-spotify"></i></div>
-            <img src="${presence.spotify.albumArtUrl}" class="presence-art" alt="Spotify Art" />
+        const sp = presence.spotify;
+        box.style.display = "flex";
+        box.className = "discord-presence-box spotify-active";
+        box.innerHTML = `
+            <img src="${sp.albumArtUrl}" class="presence-art" alt="Spotify">
             <div class="presence-info">
-                <div class="presence-title">Listening to Spotify</div>
-                <div class="presence-main">${presence.spotify.song}</div>
-                <div class="presence-sub">by ${presence.spotify.artist}</div>
-            </div>
-        `;
+                <div class="presence-label">🎵 Listening to Spotify</div>
+                <div class="presence-main">${escHtml(sp.song)}</div>
+                <div class="presence-sub">by ${escHtml(sp.artist)}</div>
+                <div class="spotify-progress-bar">
+                    <div class="spotify-progress-fill"></div>
+                </div>
+            </div>`;
     } else if (presence.game) {
-        presenceBox.style.display = "flex";
-        presenceBox.className = "discord-presence-box game-active";
-        const iconUrl = presence.game.assets && presence.game.assets.large_image
-            ? (presence.game.assets.large_image.startsWith("mp:") 
-                ? `https://media.discordapp.net/${presence.game.assets.large_image.slice(3)}`
-                : `https://cdn.discordapp.com/app-assets/${presence.game.id}/${presence.game.assets.large_image}.png`)
+        const g = presence.game;
+        const iconUrl = g.assets && g.assets.large_image
+            ? (g.assets.large_image.startsWith("mp:")
+                ? `https://media.discordapp.net/${g.assets.large_image.slice(3)}`
+                : `https://cdn.discordapp.com/app-assets/${g.id}/${g.assets.large_image}.png`)
             : null;
 
-        presenceBox.innerHTML = `
-            <div class="presence-icon"><i class="fa-solid fa-gamepad"></i></div>
-            ${iconUrl ? `<img src="${iconUrl}" class="presence-art" alt="Game Art" />` : ""}
+        box.style.display = "flex";
+        box.className = "discord-presence-box game-active";
+        box.innerHTML = `
+            ${iconUrl ? `<img src="${iconUrl}" class="presence-art" alt="Game">` : ""}
             <div class="presence-info">
-                <div class="presence-title">Playing Game</div>
-                <div class="presence-main">${presence.game.name}</div>
-                ${presence.game.details ? `<div class="presence-sub">${presence.game.details}</div>` : ""}
-            </div>
-        `;
+                <div class="presence-label">🎮 Playing</div>
+                <div class="presence-main">${escHtml(g.name)}</div>
+                ${g.details ? `<div class="presence-sub">${escHtml(g.details)}</div>` : ""}
+            </div>`;
     } else if (presence.customStatus && presence.customStatus.text) {
-        presenceBox.style.display = "flex";
-        presenceBox.className = "discord-presence-box status-active";
-        presenceBox.innerHTML = `
-            <div class="presence-icon"><i class="fa-solid fa-comment-dots"></i></div>
+        const cs = presence.customStatus;
+        box.style.display = "flex";
+        box.className = "discord-presence-box status-active";
+        box.innerHTML = `
             <div class="presence-info">
-                <div class="presence-main">${presence.customStatus.emoji ? presence.customStatus.emoji + " " : ""}${presence.customStatus.text}</div>
-            </div>
-        `;
+                <div class="presence-main">${cs.emoji ? cs.emoji + " " : ""}${escHtml(cs.text)}</div>
+            </div>`;
     } else {
-        presenceBox.style.display = "none";
+        box.style.display = "none";
     }
 }
 
-/**
- * Màn hình Click to Enter
- */
+function escHtml(s) {
+    if (!s) return "";
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* =========================================================
+   ENTER SCREEN
+   ========================================================= */
 function initEnterScreen(musicPlayer, effectsEngine) {
-    const enterScreen = document.getElementById("enter-screen");
-    const profileCard = document.getElementById("profile-card");
-    if (!enterScreen) return;
+    const screen = document.getElementById("enter-screen");
+    const card   = document.getElementById("profile-card");
+    if (!screen) return;
 
-    const handleEnter = () => {
-        if (effectsEngine) effectsEngine.playClick();
-        if (musicPlayer && window.CONFIG.music.autoplayOnEnter) {
-            musicPlayer.play();
-        }
+    const enter = () => {
+        effectsEngine && effectsEngine.playClick();
+        if (musicPlayer && window.CONFIG.music.autoplayOnEnter) musicPlayer.play();
 
-        enterScreen.classList.add("fade-out");
-        if (profileCard) profileCard.classList.add("card-appear");
+        screen.classList.add("fade-out");
+        card   && card.classList.add("card-appear");
+        setTimeout(() => { screen.style.display = "none"; }, 900);
 
-        setTimeout(() => { enterScreen.style.display = "none"; }, 800);
-        window.removeEventListener("click", handleEnter);
-        window.removeEventListener("keydown", handleEnter);
+        window.removeEventListener("click",   enter);
+        window.removeEventListener("keydown", enter);
     };
 
-    window.addEventListener("click", handleEnter, { once: true });
-    window.addEventListener("keydown", handleEnter, { once: true });
+    window.addEventListener("click",   enter, { once: true });
+    window.addEventListener("keydown", enter, { once: true });
 }
 
-/**
- * Hiệu ứng gõ chữ Typewriter
- */
-let typewriterTimeout = null;
-function initTypewriter(quotes) {
-    const textEl = document.getElementById("typewriter-text");
-    if (!textEl || !quotes || quotes.length === 0) return;
+/* =========================================================
+   ENTER SCREEN PARTICLE CANVAS
+   ========================================================= */
+function initEnterParticles() {
+    const canvas = document.getElementById("enter-particles");
+    if (!canvas) return;
 
-    if (typewriterTimeout) clearTimeout(typewriterTimeout);
+    const ctx = canvas.getContext("2d");
+    const particles = [];
+    let W, H;
 
-    let quoteIndex = 0;
-    let charIndex = 0;
-    let isDeleting = false;
+    const resize = () => {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
 
-    const type = () => {
-        const currentQuote = quotes[quoteIndex];
-        
-        if (isDeleting) {
-            textEl.textContent = currentQuote.substring(0, charIndex - 1);
-            charIndex--;
-        } else {
-            textEl.textContent = currentQuote.substring(0, charIndex + 1);
-            charIndex++;
+    for (let i = 0; i < 70; i++) {
+        particles.push({
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+            r: Math.random() * 1.8 + 0.3,
+            vx: (Math.random() - .5) * .4,
+            vy: (Math.random() - .5) * .4,
+            alpha: Math.random() * .5 + .15
+        });
+    }
+
+    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#8b5cf6";
+
+    const frame = () => {
+        if (!document.getElementById("enter-screen") ||
+            document.getElementById("enter-screen").style.display === "none") return;
+
+        ctx.clearRect(0, 0, W, H);
+        particles.forEach(p => {
+            p.x = (p.x + p.vx + W) % W;
+            p.y = (p.y + p.vy + H) % H;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(139,92,246,${p.alpha})`;
+            ctx.fill();
+        });
+        requestAnimationFrame(frame);
+    };
+    frame();
+}
+
+/* =========================================================
+   TYPEWRITER — single instance, no duplicates
+   ========================================================= */
+let _twTimer = null;
+let _twQuotes = null;
+
+function startTypewriter(quotes) {
+    if (!quotes || quotes.length === 0) return;
+
+    // If same quotes as before, do nothing (avoid restart on config save)
+    if (JSON.stringify(quotes) === JSON.stringify(_twQuotes) && _twTimer) return;
+    _twQuotes = quotes;
+
+    // Kill existing timer
+    if (_twTimer) { clearTimeout(_twTimer); _twTimer = null; }
+
+    const el = document.getElementById("typewriter-text");
+    if (!el) return;
+
+    let qi = 0, ci = 0, deleting = false;
+
+    const tick = () => {
+        const q = quotes[qi];
+        el.textContent = deleting
+            ? q.substring(0, ci - 1)
+            : q.substring(0, ci + 1);
+
+        if (!deleting) ci++;
+        else           ci--;
+
+        let speed = deleting ? 38 : 72;
+
+        if (!deleting && ci > q.length) {
+            speed = 2000;
+            deleting = true;
+        } else if (deleting && ci < 0) {
+            deleting = false;
+            qi = (qi + 1) % quotes.length;
+            ci = 0;
+            speed = 450;
         }
 
-        let speed = isDeleting ? 40 : 75;
-
-        if (!isDeleting && charIndex === currentQuote.length) {
-            speed = 2200;
-            isDeleting = true;
-        } else if (isDeleting && charIndex === 0) {
-            isDeleting = false;
-            quoteIndex = (quoteIndex + 1) % quotes.length;
-            speed = 400;
-        }
-
-        typewriterTimeout = setTimeout(type, speed);
+        _twTimer = setTimeout(tick, speed);
     };
 
-    type();
+    tick();
 }
 
-/**
- * Hiệu ứng nghiêng 3D Parallax
- */
+/* =========================================================
+   CARD TILT (3D Parallax)
+   ========================================================= */
 function initCardTilt() {
     const card = document.getElementById("profile-card");
-    if (!card || window.innerWidth < 768) return;
+    if (!card || window.matchMedia("(hover:none)").matches) return;
 
-    let bounds;
-    function updateBounds() { bounds = card.getBoundingClientRect(); }
-    updateBounds();
-    window.addEventListener("resize", updateBounds);
-
-    document.addEventListener("mousemove", (e) => {
-        if (!bounds) return;
-        const leftX = e.clientX - bounds.x;
-        const topY = e.clientY - bounds.y;
-
-        const center = {
-            x: leftX - bounds.width / 2,
-            y: topY - bounds.height / 2
-        };
-
-        const maxAngle = 8;
-        const rotateX = (-center.y / (bounds.height / 2)) * maxAngle;
-        const rotateY = (center.x / (bounds.width / 2)) * maxAngle;
-
-        card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.01, 1.01, 1.01)`;
-        card.style.setProperty("--glare-x", `${(leftX / bounds.width) * 100}%`);
-        card.style.setProperty("--glare-y", `${(topY / bounds.height) * 100}%`);
+    card.addEventListener("mousemove", (e) => {
+        const r    = card.getBoundingClientRect();
+        const cx   = r.left + r.width  / 2;
+        const cy   = r.top  + r.height / 2;
+        const rotX = ((e.clientY - cy) / (r.height / 2)) * -5;
+        const rotY = ((e.clientX - cx) / (r.width  / 2)) *  5;
+        card.style.transform =
+            `perspective(1000px) rotateX(${rotX.toFixed(1)}deg) rotateY(${rotY.toFixed(1)}deg) scale3d(1.008,1.008,1)`;
     });
 
-    document.addEventListener("mouseleave", () => {
-        card.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+    card.addEventListener("mouseleave", () => {
+        card.style.transform = "perspective(1000px) rotateX(0) rotateY(0) scale3d(1,1,1)";
     });
 }
 
-/**
- * Con trỏ chuột neon & Sparkles
- */
-function initCustomCursor() {
-    const cursor = document.getElementById("custom-cursor");
-    const follower = document.getElementById("cursor-follower");
-    if (!cursor || !follower || window.matchMedia("(pointer: coarse)").matches) return;
+/* =========================================================
+   CARD GLARE (holographic shine follows mouse)
+   ========================================================= */
+function initCardGlare() {
+    const card  = document.getElementById("profile-card");
+    const glare = document.getElementById("card-glare");
+    if (!card || !glare || window.matchMedia("(hover:none)").matches) return;
 
-    let mouseX = 0, mouseY = 0;
-    let followerX = 0, followerY = 0;
+    card.addEventListener("mousemove", (e) => {
+        const r = card.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width  * 100).toFixed(1);
+        const y = ((e.clientY - r.top)  / r.height * 100).toFixed(1);
+        card.style.setProperty("--glare-x", `${x}%`);
+        card.style.setProperty("--glare-y", `${y}%`);
+    });
+
+    card.addEventListener("mouseleave", () => {
+        card.style.setProperty("--glare-x", "50%");
+        card.style.setProperty("--glare-y", "-20%");
+    });
+}
+
+/* =========================================================
+   CUSTOM CURSOR (centered with margin trick)
+   ========================================================= */
+function initCustomCursor(cfg) {
+    const cursor   = document.getElementById("custom-cursor");
+    const follower = document.getElementById("cursor-follower");
+    if (!cursor || !follower || window.matchMedia("(hover:none)").matches) return;
+
+    let fx = 0, fy = 0, mx = 0, my = 0;
 
     document.addEventListener("mousemove", (e) => {
-        mouseX = e.clientX;
-        mouseY = e.clientY;
-        cursor.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0)`;
+        mx = e.clientX;
+        my = e.clientY;
+        cursor.style.transform = `translate3d(${mx}px,${my}px,0)`;
 
-        if (window.CONFIG.theme && window.CONFIG.theme.sparkleTrail && Math.random() > 0.65) {
-            createSparkle(mouseX, mouseY);
+        // Sparkle trail
+        if (cfg.theme.sparkleTrail !== false && Math.random() > 0.68) {
+            spawnSparkle(mx, my);
         }
     });
 
-    function renderFollower() {
-        followerX += (mouseX - followerX) * 0.15;
-        followerY += (mouseY - followerY) * 0.15;
-        follower.style.transform = `translate3d(${followerX}px, ${followerY}px, 0)`;
-        requestAnimationFrame(renderFollower);
-    }
-    renderFollower();
+    const followLoop = () => {
+        fx += (mx - fx) * 0.12;
+        fy += (my - fy) * 0.12;
+        follower.style.transform = `translate3d(${fx}px,${fy}px,0)`;
+        requestAnimationFrame(followLoop);
+    };
+    followLoop();
 
     document.addEventListener("mousedown", () => {
-        follower.classList.add("active");
-        for (let i = 0; i < 4; i++) createSparkle(mouseX, mouseY);
+        follower.classList.add("clicking");
+        for (let i = 0; i < 5; i++) spawnSparkle(mx, my);
     });
-    document.addEventListener("mouseup", () => follower.classList.remove("active"));
+    document.addEventListener("mouseup", () => follower.classList.remove("clicking"));
 }
 
-function createSparkle(x, y) {
-    const sparkle = document.createElement("div");
-    sparkle.className = "sparkle-particle";
-    sparkle.style.left = `${x}px`;
-    sparkle.style.top = `${y}px`;
-
+function spawnSparkle(x, y) {
+    const s     = document.createElement("div");
+    s.className = "sparkle-particle";
     const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 25 + 10;
-    sparkle.style.setProperty("--dest-x", `${Math.cos(angle) * speed}px`);
-    sparkle.style.setProperty("--dest-y", `${Math.sin(angle) * speed}px`);
-
-    document.body.appendChild(sparkle);
-    setTimeout(() => sparkle.remove(), 600);
+    const dist  = Math.random() * 28 + 8;
+    s.style.left = `${x}px`;
+    s.style.top  = `${y}px`;
+    s.style.setProperty("--dx", `${(Math.cos(angle) * dist).toFixed(1)}px`);
+    s.style.setProperty("--dy", `${(Math.sin(angle) * dist).toFixed(1)}px`);
+    s.style.background = `hsl(${Math.random()*60 + 240},100%,75%)`;
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 560);
 }
 
-/**
- * Bộ đếm VIEW THẬT (Real Server View Counter)
- */
-async function initRealViewCounter() {
-    const viewEl = document.getElementById("profile-views");
-    if (!viewEl) return;
+/* =========================================================
+   REAL VIEW COUNTER (Railway server API)
+   ========================================================= */
+async function initRealViewCounter(cfg) {
+    const el = document.getElementById("profile-views");
+    if (!el) return;
 
     try {
-        // Gửi POST request tới API của server Railway để tăng view và lấy kết quả
-        const res = await fetch("/api/views", { method: "POST" });
-        if (res.ok) {
-            const data = await res.json();
-            if (data && typeof data.views === "number") {
-                viewEl.textContent = data.views.toLocaleString();
-                return;
-            }
+        const res  = await fetch("/api/views", { method: "POST" });
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        if (typeof data.views === "number") {
+            el.textContent = data.views.toLocaleString("vi-VN");
+            return;
         }
     } catch (e) {
-        console.warn("Không kết nối được server view, dùng fallback:", e);
+        console.warn("[Views] API unavailable, using localStorage fallback");
     }
 
-    // Fallback nếu chạy ở môi trường không có server
-    let views = parseInt(localStorage.getItem("anklabo_bio_views") || (window.CONFIG.profile.viewsInitial || 1337));
-    views += 1;
-    localStorage.setItem("anklabo_bio_views", views.toString());
-    viewEl.textContent = views.toLocaleString();
+    // Fallback
+    let v = parseInt(localStorage.getItem("anklabo_bio_views") || (cfg.profile.viewsInitial || 1337), 10);
+    v += 1;
+    localStorage.setItem("anklabo_bio_views", String(v));
+    el.textContent = v.toLocaleString("vi-VN");
 }
 
-/**
- * Gán âm thanh click UI vào các nút
- */
-function initClickSounds(effectsEngine) {
-    if (!effectsEngine) return;
-    document.addEventListener("click", (e) => {
-        if (e.target.closest("button") || e.target.closest(".social-btn") || e.target.closest(".bio-badge")) {
-            effectsEngine.playClick();
-        }
-    });
-}
-
+/* =========================================================
+   GLOBAL TOAST
+   ========================================================= */
 function showBioToast(msg) {
-    let toast = document.getElementById("bio-toast");
-    if (!toast) {
-        toast = document.createElement("div");
-        toast.id = "bio-toast";
-        document.body.appendChild(toast);
+    let t = document.getElementById("bio-toast");
+    if (!t) {
+        t = document.createElement("div");
+        t.id = "bio-toast";
+        document.body.appendChild(t);
     }
-    toast.textContent = msg;
-    toast.className = "show";
-    setTimeout(() => { toast.className = ""; }, 3200);
+    t.textContent = msg;
+    t.className   = "show";
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = ""; }, 3200);
 }
 window.showBioToast = showBioToast;
