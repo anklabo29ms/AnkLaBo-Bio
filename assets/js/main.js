@@ -12,8 +12,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const saved = localStorage.getItem("anklabo_bio_custom_config");
         if (saved) {
             const parsed = JSON.parse(saved);
-            // Deep-merge top-level sections only
+            if (Array.isArray(parsed.badges) && Array.isArray(window.CONFIG.badges)) {
+                const enabledMap = new Map(parsed.badges.map(b => [b.id, b.enabled]));
+                window.CONFIG.badges.forEach(b => {
+                    if (enabledMap.has(b.id)) {
+                        b.enabled = enabledMap.get(b.id);
+                    }
+                });
+            }
+            // Deep-merge top-level sections only (skip badges array since handled above)
             Object.keys(parsed).forEach(k => {
+                if (k === "badges") return;
                 if (typeof parsed[k] === "object" && !Array.isArray(parsed[k])) {
                     window.CONFIG[k] = Object.assign({}, window.CONFIG[k] || {}, parsed[k]);
                 } else {
