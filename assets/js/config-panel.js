@@ -224,9 +224,12 @@ class ConfigPanel {
         badges.forEach((b, index) => {
             const item = document.createElement("label");
             item.className = "cfg-badge-toggle-item";
+            const iconHtml = b.type === "img"
+                ? `<img src="${b.icon}" style="width: 18px; height: 18px; object-fit: contain; margin-right: 6px; vertical-align: middle;" alt="">`
+                : `<i class="${b.icon}" style="color: ${b.color}; margin-right: 6px;"></i>`;
             item.innerHTML = `
                 <input type="checkbox" data-index="${index}" ${b.enabled !== false ? "checked" : ""}>
-                <i class="${b.icon}" style="color: ${b.color}; margin-right: 6px;"></i>
+                ${iconHtml}
                 <span>${b.name}</span>
             `;
             item.querySelector("input").addEventListener("change", (e) => {
